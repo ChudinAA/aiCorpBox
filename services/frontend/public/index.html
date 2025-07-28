@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Box - Enterprise AI Platform</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <h1>🤖 AI Box</h1>
+                        <span class="subtitle">Enterprise AI Platform</span>
+                    </div>
+                    <div class="status-bar">
+                        <div class="status-item" id="gateway-status">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Подключение...</span>
+                        </div>
+                        <div class="status-item" id="websocket-status">
+                            <span class="status-dot"></span>
+                            <span class="status-text">WebSocket</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div class="container">
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button class="tab-button active" data-tab="overview">Обзор</button>
+                    <button class="tab-button" data-tab="chat">Чат с AI</button>
+                    <button class="tab-button" data-tab="rag">Документы (RAG)</button>
+                    <button class="tab-button" data-tab="agents">AI Агенты</button>
+                    <button class="tab-button" data-tab="database">База данных</button>
+                    <button class="tab-button" data-tab="monitoring">Мониторинг</button>
+                </nav>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Overview Tab -->
+                    <div class="tab-panel active" id="overview-panel">
+                        <div class="overview-grid">
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>🌐 API Gateway</h3>
+                                    <span class="service-status" id="gateway-service-status">Проверка...</span>
+                                </div>
+                                <p>Единая точка входа для всех AI сервисов с поддержкой WebSocket, аутентификации и мониторинга.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">Rate Limiting</span>
+                                    <span class="feature-tag">Request Routing</span>
+                                    <span class="feature-tag">Metrics Collection</span>
+                                </div>
+                            </div>
+
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>🤖 LLM Service (Ollama)</h3>
+                                    <span class="service-status" id="ollama-service-status">Проверка...</span>
+                                </div>
+                                <p>Локальные языковые модели для приватного AI инференса без внешних зависимостей.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">Llama</span>
+                                    <span class="feature-tag">CodeLlama</span>
+                                    <span class="feature-tag">Mistral</span>
+                                </div>
+                            </div>
+
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>📚 RAG Service</h3>
+                                    <span class="service-status" id="rag-service-status">Проверка...</span>
+                                </div>
+                                <p>Обработка документов и поиск с использованием LlamaIndex и векторного поиска.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">PDF/DOCX</span>
+                                    <span class="feature-tag">Semantic Search</span>
+                                    <span class="feature-tag">Context-Aware</span>
+                                </div>
+                            </div>
+
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>🔧 AI Agents</h3>
+                                    <span class="service-status" id="agents-service-status">Проверка...</span>
+                                </div>
+                                <p>Интеллектуальные агенты на основе LangChain с кастомными инструментами для автоматизации сложных задач.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">Document Agent</span>
+                                    <span class="feature-tag">Database Agent</span>
+                                    <span class="feature-tag">Custom Tools</span>
+                                </div>
+                            </div>
+
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>💾 PostgreSQL</h3>
+                                    <span class="service-status" id="postgres-service-status">Проверка...</span>
+                                </div>
+                                <p>Основная База данных приложения для разговоров, метаданных и структурированного хранения данных.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">ACID Compliance</span>
+                                    <span class="feature-tag">Full-text Search</span>
+                                    <span class="feature-tag">JSON Support</span>
+                                </div>
+                            </div>
+
+                            <div class="service-card">
+                                <div class="service-header">
+                                    <h3>📊 Monitoring</h3>
+                                    <span class="service-status" id="monitoring-service-status">Проверка...</span>
+                                </div>
+                                <p>Сбор метрик Prometheus с дашбордами Grafana для комплексного мониторинга.</p>
+                                <div class="service-features">
+                                    <span class="feature-tag">Request Rates</span>
+                                    <span class="feature-tag">Response Times</span>
+                                    <span class="feature-tag">Resource Usage</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Architecture Diagram -->
+                        <div class="architecture-section">
+                            <h2>🏗️ Архитектура системы</h2>
+                            <div class="architecture-diagram">
+                                <pre>
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Users/Apps    │───▶│  Load Balancer  │───▶│  API Gateway    │
+│                 │    │   (Nginx)       │    │   (Port 5000)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+                       ┌────────────────────────────────┼────────────────────────────────┐
+                       │                                │                                │
+                       ▼                                ▼                                ▼
+            ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
+            │  Ollama LLM     │            │   RAG Service   │            │  AI Agents      │
+            │  (Port 11434)   │            │  (Port 8001)    │            │  (Port 8002)    │
+            └─────────────────┘            └─────────────────┘            └─────────────────┘
+                       │                                │                                │
+                       │                                ▼                                ▼
+                       │                    ┌─────────────────┐            ┌─────────────────┐
+                       │                    │  Qdrant Vector  │            │   PostgreSQL    │
+                       │                    │   Database      │            │   Database      │
+                       │                    │  (Port 6333)    │            │  (Port 5432)    │
+                       │                    └─────────────────┘            └─────────────────┘
+                       │
+                       ▼
+            ┌─────────────────┐            ┌─────────────────┐
+            │   Prometheus    │            │     Grafana     │
+            │  (Port 9090)    │───────────▶│  (Port 3000)    │
+            └─────────────────┘            └─────────────────┘
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Tab -->
+                    <div class="tab-panel" id="chat-panel">
+                        <div class="chat-container">
+                            <div class="chat-header">
+                                <h2>💬 Чат с AI</h2>
+                                <div class="chat-controls">
+                                    <select id="service-selector">
+                                        <option value="general">Общий чат</option>
+                                        <option value="rag">Вопросы по документам</option>
+                                        <option value="agents">AI Агенты</option>
+                                        <option value="database">Запросы к базе данных</option>
+                                    </select>
+                                    <button id="clear-chat" class="btn-secondary">Очистить</button>
+                                </div>
+                            </div>
+                            <div class="chat-messages" id="chat-messages"></div>
+                            <div class="chat-input-container">
+                                <div class="chat-input-wrapper">
+                                    <textarea id="chat-input" placeholder="Введите ваше сообщение..." rows="3"></textarea>
+                                    <button id="send-button" class="btn-primary">Отправить</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RAG Tab -->
+                    <div class="tab-panel" id="rag-panel">
+                        <div class="rag-container">
+                            <div class="section">
+                                <h2>📄 Управление документами</h2>
+                                <div class="upload-section">
+                                    <div class="upload-area" id="upload-area">
+                                        <div class="upload-content">
+                                            <div class="upload-icon">📁</div>
+                                            <p>Перетащите файлы сюда или нажмите для выбора</p>
+                                            <p class="upload-hint">Поддерживается: PDF, DOCX, TXT, HTML</p>
+                                        </div>
+                                        <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.html,.htm" style="display: none;">
+                                    </div>
+                                    <button id="upload-button" class="btn-primary">Загрузить документы</button>
+                                </div>
+                            </div>
+
+                            <div class="section">
+                                <h2>🔍 Поиск в документах</h2>
+                                <div class="search-section">
+                                    <div class="search-input-wrapper">
+                                        <input type="text" id="document-search" placeholder="Введите запрос для поиска в документах...">
+                                        <button id="search-button" class="btn-primary">Поиск</button>
+                                    </div>
+                                    <div class="search-results" id="search-results"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agents Tab -->
+                    <div class="tab-panel" id="agents-panel">
+                        <div class="agents-container">
+                            <div class="section">
+                                <h2>🤖 Доступные агенты</h2>
+                                <div class="agents-list" id="agents-list">
+                                    <div class="loading">Загрузка доступных агентов...</div>
+                                </div>
+                            </div>
+
+                            <div class="section">
+                                <h2>⚡ Выполнение задачи</h2>
+                                <div class="agent-execution">
+                                    <div class="form-group">
+                                        <label for="agent-selector">Выберите агента:</label>
+                                        <select id="agent-selector">
+                                            <option value="">Загрузка...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="agent-task">Задача:</label>
+                                        <textarea id="agent-task" placeholder="Опишите задачу для агента..." rows="4"></textarea>
+                                    </div>
+                                    <button id="execute-agent" class="btn-primary">Выполнить задачу</button>
+                                    <div class="agent-result" id="agent-result"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Database Tab -->
+                    <div class="tab-panel" id="database-panel">
+                        <div class="database-container">
+                            <div class="section">
+                                <h2>🗄️ Схема базы данных</h2>
+                                <button id="load-schema" class="btn-secondary">Загрузить схему</button>
+                                <div class="schema-display" id="schema-display"></div>
+                            </div>
+
+                            <div class="section">
+                                <h2>📊 SQL Запросы</h2>
+                                <div class="sql-editor">
+                                    <div class="form-group">
+                                        <label for="sql-query">SQL Запрос:</label>
+                                        <textarea id="sql-query" placeholder="SELECT * FROM table_name LIMIT 10;" rows="6"></textarea>
+                                    </div>
+                                    <div class="query-controls">
+                                        <label class="checkbox-wrapper">
+                                            <input type="checkbox" id="safe-mode" checked>
+                                            <span class="checkmark"></span>
+                                            Безопасный режим (только SELECT)
+                                        </label>
+                                        <button id="execute-query" class="btn-primary">Выполнить запрос</button>
+                                    </div>
+                                    <div class="query-result" id="query-result"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monitoring Tab -->
+                    <div class="tab-panel" id="monitoring-panel">
+                        <div class="monitoring-container">
+                            <div class="section">
+                                <h2>📈 Системные метрики</h2>
+                                <button id="refresh-metrics" class="btn-secondary">Обновить метрики</button>
+                                <div class="metrics-display" id="metrics-display">
+                                    <div class="loading">Загрузка метрик...</div>
+                                </div>
+                            </div>
+
+                            <div class="section">
+                                <h2>🔗 Внешние ссылки</h2>
+                                <div class="external-links">
+                                    <a href="/metrics" target="_blank" class="external-link">
+                                        📊 Prometheus метрики
+                                    </a>
+                                    <a href="http://localhost:3000" target="_blank" class="external-link">
+                                        📈 Grafana дашборды
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2025 AI Box - Enterprise AI Platform. Максимально обособленный фронтенд сервис.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <p class="loading-text">Обработка запроса...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/tabs.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/rag.js"></script>
+    <script src="js/agents.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/monitoring.js"></script>
+</body>
+</html>

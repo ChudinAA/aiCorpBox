@@ -1,0 +1,51 @@
+[Unit]
+Description=AI Box - Enterprise AI Platform
+Documentation=https://github.com/aibox/docs
+After=docker.service
+Requires=docker.service
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+User={{ aibox_user }}
+Group={{ aibox_user }}
+WorkingDirectory={{ aibox_home }}
+
+# Start command
+ExecStart=/usr/local/bin/docker-compose -f {{ aibox_home }}/docker-compose.prod.yml up -d
+
+# Stop command  
+ExecStop=/usr/local/bin/docker-compose -f {{ aibox_home }}/docker-compose.prod.yml down
+
+# Reload command
+ExecReload=/usr/local/bin/docker-compose -f {{ aibox_home }}/docker-compose.prod.yml restart
+
+# Health check
+ExecStartPost=/bin/bash -c 'sleep 30; curl -f http://localhost:{{ gateway_port }}/health'
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=aibox
+Environment=COMPOSE_FILE={{ aibox_home }}/docker-compose.prod.yml
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ aibox_home }}
+ReadOnlyDirectories=/
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aibox
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

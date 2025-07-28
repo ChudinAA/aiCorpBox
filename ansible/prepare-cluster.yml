@@ -1,0 +1,285 @@
+---
+# AI Box - Подготовка Kubernetes кластера
+# Полная автоматизация установки и настройки кластера
+
+- name: "AI Box - Подготовка кластера"
+  hosts: k8s_cluster
+  become: yes
+  vars_files:
+    - vars/main.yml
+  
+  pre_tasks:
+    - name: "🔍 Проверка системных требований"
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 2048
+          - ansible_facts['processor_vcpus'] >= 2
+        fail_msg: "Недостаточно ресурсов для кластера (нужно минимум 2GB RAM, 2 CPU)"
+
+    - name: "📊 Вывод информации о системе"
+      debug:
+        msg: 
+          - "Узел: {{ inventory_hostname }}"
+          - "Роль: {{ k8s_role | default('worker') }}"
+          - "ОС: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "RAM: {{ (ansible_facts['memtotal_mb'] / 1024) | round(1) }}GB"
+          - "CPU: {{ ansible_facts['processor_vcpus'] }} cores"
+
+  tasks:
+    - name: "🔄 Обновление системы"
+      apt:
+        upgrade: dist
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: "📦 Установка базовых пакетов"
+      package:
+        name:
+          - curl
+          - wget
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - python3-pip
+        state: present
+
+    - name: "⚙️ Отключение swap (требуется для Kubernetes)"
+      shell: |
+        swapoff -a
+        sed -i '/ swap / s/^/#/' /etc/fstab
+      ignore_errors: yes
+
+    - name: "🔧 Настройка модулей ядра"
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: "🔧 Загрузка модулей ядра"
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: "🔧 Настройка параметров системы для Kubernetes"
+      copy:
+        dest: /etc/sysctl.d/k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+
+    - name: "🔧 Применение параметров системы"
+      command: sysctl --system
+
+    - name: "🐳 Установка Docker"
+      include_tasks: tasks/install-docker.yml
+
+    - name: "⚙️ Настройка Docker для Kubernetes"
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "100m"
+            },
+            "storage-driver": "overlay2"
+          }
+
+    - name: "🔄 Перезапуск Docker"
+      systemd:
+        name: docker
+        daemon_reload: yes
+        state: restarted
+
+    - name: "☸️ Установка Kubernetes"
+      include_tasks: tasks/install-kubernetes.yml
+
+- name: "Инициализация master узла"
+  hosts: masters
+  become: yes
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: "🔍 Проверка инициализации кластера"
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubernetes_init_status
+
+    - name: "🚀 Инициализация Kubernetes кластера"
+      shell: |
+        kubeadm init \
+          --pod-network-cidr={{ k8s_pod_network_cidr | default('10.244.0.0/16') }} \
+          --service-cidr={{ k8s_service_cidr | default('10.96.0.0/12') }} \
+          --apiserver-advertise-address={{ k8s_node_ip }}
+      register: kubeadm_init
+      when: not kubernetes_init_status.stat.exists
+
+    - name: "⚙️ Настройка kubectl для root"
+      shell: |
+        mkdir -p /root/.kube
+        cp -f /etc/kubernetes/admin.conf /root/.kube/config
+        chown root:root /root/.kube/config
+      when: not kubernetes_init_status.stat.exists
+
+    - name: "⚙️ Настройка kubectl для пользователя"
+      shell: |
+        mkdir -p /home/{{ ansible_user }}/.kube
+        cp -f /etc/kubernetes/admin.conf /home/{{ ansible_user }}/.kube/config
+        chown {{ ansible_user }}:{{ ansible_user }} /home/{{ ansible_user }}/.kube/config
+      when: not kubernetes_init_status.stat.exists
+
+    - name: "🌐 Установка CNI плагина Calico"
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/custom-resources.yaml
+      become_user: "{{ ansible_user }}"
+      when: not kubernetes_init_status.stat.exists
+
+    - name: "⏳ Ожидание готовности Calico"
+      shell: kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      become_user: "{{ ansible_user }}"
+      retries: 3
+      delay: 10
+      ignore_errors: yes
+
+    - name: "🔑 Получение токена для подключения worker узлов"
+      shell: kubeadm token create --print-join-command
+      register: kubeadm_join_command
+
+    - name: "📝 Сохранение команды подключения"
+      set_fact:
+        join_command: "{{ kubeadm_join_command.stdout }}"
+
+- name: "Подключение worker узлов"
+  hosts: workers
+  become: yes
+  tasks:
+    - name: "🔍 Проверка подключения к кластеру"
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: worker_joined
+
+    - name: "🔗 Подключение к кластеру"
+      shell: "{{ hostvars[groups['masters'][0]]['join_command'] }}"
+      when: 
+        - hostvars[groups['masters'][0]]['join_command'] is defined
+        - not worker_joined.stat.exists
+
+- name: "Установка дополнительных компонентов кластера"
+  hosts: masters
+  become: yes
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: "📦 Установка Helm"
+      shell: |
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        chmod 700 /tmp/get_helm.sh
+        /tmp/get_helm.sh
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: "📦 Добавление Helm репозиториев"
+      shell: |
+        helm repo add bitnami https://charts.bitnami.com/bitnami
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+      become_user: "{{ ansible_user }}"
+
+    - name: "🌐 Установка NGINX Ingress Controller"
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.0/deploy/static/provider/baremetal/deploy.yaml
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: "📊 Установка metrics-server"
+      shell: |
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: "📂 Создание namespace для AI Box"
+      shell: kubectl create namespace {{ aibox_namespace | default('aibox') }}
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: "📋 Создание StorageClass для локального хранилища"
+      copy:
+        dest: /tmp/local-storage.yaml
+        content: |
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: local-storage
+          provisioner: kubernetes.io/no-provisioner
+          volumeBindingMode: WaitForFirstConsumer
+          ---
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: fast-ssd
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+          provisioner: kubernetes.io/no-provisioner
+          volumeBindingMode: WaitForFirstConsumer
+
+    - name: "⚙️ Применение StorageClass"
+      shell: kubectl apply -f /tmp/local-storage.yaml
+      become_user: "{{ ansible_user }}"
+
+    - name: "📋 Создание секретов для Docker Hub (если указан registry)"
+      shell: |
+        kubectl create secret docker-registry regcred \
+          --docker-server=https://index.docker.io/v1/ \
+          --docker-username={{ docker_hub_username }} \
+          --docker-password={{ docker_hub_password }} \
+          --docker-email={{ docker_hub_email }} \
+          --namespace={{ aibox_namespace | default('aibox') }}
+      become_user: "{{ ansible_user }}"
+      when: 
+        - docker_hub_username is defined
+        - docker_hub_password is defined
+      ignore_errors: yes
+
+    - name: "✅ Проверка готовности кластера"
+      shell: kubectl get nodes -o wide
+      become_user: "{{ ansible_user }}"
+      register: cluster_status
+
+    - name: "📊 Вывод статуса кластера"
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+    - name: "📋 Проверка системных компонентов"
+      shell: kubectl get pods -n kube-system
+      become_user: "{{ ansible_user }}"
+      register: system_pods
+
+    - name: "📊 Вывод системных компонентов"
+      debug:
+        msg: "{{ system_pods.stdout_lines }}"
+
+    - name: "📋 Информация о кластере"
+      debug:
+        msg:
+          - "✅ Kubernetes кластер подготовлен!"
+          - "📊 Версия: {{ k8s_version | default('latest') }}"
+          - "🌐 Master: {{ groups['masters'][0] }}"
+          - "👷 Workers: {{ groups['workers'] | join(', ') }}"
+          - "📦 Namespace: {{ aibox_namespace | default('aibox') }}"
+          - "🔧 Управление:"
+          - "  - Статус узлов: kubectl get nodes"
+          - "  - Системные поды: kubectl get pods -n kube-system"
+          - "  - AI Box поды: kubectl get pods -n {{ aibox_namespace | default('aibox') }}"
+          - "📦 Следующий шаг:"
+          - "  - Для развертывания AI Box: ./scripts/deploy-manager.sh cluster [build|hub]"

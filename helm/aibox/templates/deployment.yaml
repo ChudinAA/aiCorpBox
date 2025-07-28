@@ -1,0 +1,340 @@
+{{- $registry := .Values.global.imageRegistry | default "" -}}
+{{- $imageTag := .Values.global.imageTag | default .Chart.AppVersion -}}
+---
+# Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-gateway
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: gateway
+        image: "{{ if $registry }}{{ $registry }}/{{ end }}{{ .Values.gateway.image.repository | default "aibox-gateway" }}:{{ .Values.gateway.image.tag | default $imageTag }}"
+        imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.gateway.service.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "{{ .Values.gateway.service.port }}"
+        - name: POSTGRES_HOST
+          value: "{{ include "aibox.fullname" . }}-postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.auth.database }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.auth.username }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "aibox.fullname" . }}-secrets
+              key: postgres-password
+        - name: QDRANT_HOST
+          value: "{{ include "aibox.fullname" . }}-qdrant"
+        - name: QDRANT_PORT
+          value: "{{ .Values.qdrant.service.port }}"
+        - name: OLLAMA_HOST
+          value: "{{ include "aibox.fullname" . }}-ollama"
+        - name: OLLAMA_PORT
+          value: "{{ .Values.ollama.service.port }}"
+        - name: RAG_SERVICE_URL
+          value: "http://{{ include "aibox.fullname" . }}-rag:{{ .Values.rag.service.port }}"
+        - name: AGENTS_SERVICE_URL
+          value: "http://{{ include "aibox.fullname" . }}-agents:{{ .Values.agents.service.port }}"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.gateway.resources | nindent 12 }}
+      {{- with .Values.gateway.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.gateway.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.gateway.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-frontend
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas | default 2 }}
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: frontend
+        image: "{{ if $registry }}{{ $registry }}/{{ end }}{{ .Values.frontend.image.repository | default "aibox-frontend" }}:{{ .Values.frontend.image.tag | default $imageTag }}"
+        imagePullPolicy: {{ .Values.frontend.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.frontend.service.port | default 5000 }}
+          protocol: TCP
+        env:
+        - name: GATEWAY_URL
+          value: "http://{{ include "aibox.fullname" . }}-gateway:{{ .Values.gateway.service.port }}"
+        - name: GATEWAY_WS_URL
+          value: "ws://{{ include "aibox.fullname" . }}-gateway:{{ .Values.gateway.service.port }}/ws"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.frontend.resources | default .Values.gateway.resources | nindent 12 }}
+---
+# RAG Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-rag
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rag
+spec:
+  replicas: {{ .Values.rag.replicas }}
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: rag
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: rag
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: rag
+        image: "{{ if $registry }}{{ $registry }}/{{ end }}{{ .Values.rag.image.repository | default "aibox-rag" }}:{{ .Values.rag.image.tag | default $imageTag }}"
+        imagePullPolicy: {{ .Values.rag.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.rag.service.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "{{ .Values.rag.service.port }}"
+        - name: POSTGRES_HOST
+          value: "{{ include "aibox.fullname" . }}-postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.auth.database }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.auth.username }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "aibox.fullname" . }}-secrets
+              key: postgres-password
+        - name: QDRANT_HOST
+          value: "{{ include "aibox.fullname" . }}-qdrant"
+        - name: QDRANT_PORT
+          value: "{{ .Values.qdrant.service.port }}"
+        - name: OLLAMA_HOST
+          value: "{{ include "aibox.fullname" . }}-ollama"
+        - name: OLLAMA_PORT
+          value: "{{ .Values.ollama.service.port }}"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.rag.resources | nindent 12 }}
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+# Agents Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-agents
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agents
+spec:
+  replicas: {{ .Values.agents.replicas }}
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agents
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agents
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: agents
+        image: "{{ if $registry }}{{ $registry }}/{{ end }}{{ .Values.agents.image.repository | default "aibox-agents" }}:{{ .Values.agents.image.tag | default $imageTag }}"
+        imagePullPolicy: {{ .Values.agents.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.agents.service.port }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "{{ .Values.agents.service.port }}"
+        - name: POSTGRES_HOST
+          value: "{{ include "aibox.fullname" . }}-postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.auth.database }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.auth.username }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "aibox.fullname" . }}-secrets
+              key: postgres-password
+        - name: OLLAMA_HOST
+          value: "{{ include "aibox.fullname" . }}-ollama"
+        - name: OLLAMA_PORT
+          value: "{{ .Values.ollama.service.port }}"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.agents.resources | nindent 12 }}
+---
+# Monitoring Deployment (Prometheus with custom config)
+{{- if .Values.monitoring.prometheus.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-prometheus
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: prometheus
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: prometheus
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: prometheus
+        image: "{{ if $registry }}{{ $registry }}/{{ end }}{{ .Values.monitoring.image.repository | default "aibox-monitoring" }}:{{ .Values.monitoring.image.tag | default $imageTag }}"
+        imagePullPolicy: {{ .Values.monitoring.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: 9090
+          protocol: TCP
+        args:
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        - "--storage.tsdb.path=/prometheus"
+        - "--web.console.libraries=/etc/prometheus/console_libraries"
+        - "--web.console.templates=/etc/prometheus/consoles"
+        - "--web.enable-lifecycle"
+        - "--storage.tsdb.retention.time={{ .Values.monitoring.prometheus.retention }}"
+        volumeMounts:
+        - name: prometheus-storage
+          mountPath: /prometheus
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi
+      volumes:
+      - name: prometheus-storage
+        emptyDir: {}
+{{- end }}

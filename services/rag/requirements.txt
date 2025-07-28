@@ -1,0 +1,47 @@
+# Core FastAPI and server
+fastapi
+uvicorn[standard]
+
+# LlamaIndex and LLM integration
+llama-index
+llama-index-vector-stores-qdrant
+llama-index-embeddings-huggingface
+llama-index-llms-ollama
+
+# Vector database
+qdrant-client
+
+# ML and embeddings
+sentence-transformers>=2.2.0
+transformers>=4.21.0
+torch>=1.13.0
+datasets
+
+# Database
+psycopg2-binary
+sqlalchemy
+alembic
+
+# Data validation and settings
+pydantic
+pydantic-settings
+
+# File processing
+python-multipart
+aiofiles
+pypdf
+python-docx
+openpyxl
+beautifulsoup4
+
+# HTTP client
+requests
+
+# Data processing
+numpy
+pandas
+scikit-learn
+
+# Monitoring and logging
+structlog
+prometheus-client

@@ -1,0 +1,233 @@
+# AI Box - Локальное развертывание
+# Использует образы из папки services
+
+services:
+  # AI Box Frontend - максимально обособленный интерфейс
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: aibox-frontend
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    env_file:
+      - .env
+    environment:
+      - GATEWAY_URL=http://gateway:${GATEWAY_PORT}
+      - GATEWAY_WS_URL=ws://gateway:${GATEWAY_PORT}/ws
+      - NODE_ENV=development
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Box Gateway - единая точка входа
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: aibox-gateway
+    ports:
+      - "8000:${GATEWAY_PORT}" # use 8000 port temporary for local testing instead of 5000 port
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RAG Service - документооборот и поиск
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile
+    container_name: aibox-rag
+    ports:
+      - "${RAG_PORT}:${RAG_PORT}"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${RAG_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Agents Service - интеллектуальные агенты
+  agents:
+    build:
+      context: ./services/agents
+      dockerfile: Dockerfile
+    container_name: aibox-agents
+    ports:
+      - "${AGENTS_PORT}:${AGENTS_PORT}"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${AGENTS_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama - локальные языковые модели
+  ollama:
+    build:
+      context: ./services/ollama
+      dockerfile: Dockerfile
+    container_name: aibox-ollama
+    ports:
+      - "${OLLAMA_PORT}:${OLLAMA_PORT}"
+    volumes:
+      - ollama-data:/root/.ollama
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_ORIGINS=*
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${OLLAMA_PORT}/api/tags"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
+
+  # PostgreSQL - основная база данных
+  postgres:
+    image: postgres:15
+    container_name: aibox-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Qdrant - векторная база данных
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: aibox-qdrant
+    ports:
+      - "${VECTOR_DB_PORT}:${VECTOR_DB_PORT}"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: ${VECTOR_DB_PORT}
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__ENABLE_CORS: true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 5s bash -c '</dev/tcp/localhost/${VECTOR_DB_PORT}' || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Prometheus - сбор метрик
+  prometheus:
+    build:
+      context: ./services/monitoring
+      dockerfile: Dockerfile
+    container_name: aibox-prometheus
+    ports:
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+    volumes:
+      - prometheus-data:/prometheus
+    environment:
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT}
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    depends_on:
+      - gateway
+      - rag
+      - agents
+
+  # Grafana - дашборды мониторинга
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aibox-grafana
+    ports:
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_HTTP_PORT=${GRAFANA_PORT}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres-data:
+    driver: local
+  qdrant-data:
+    driver: local
+  ollama-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  aibox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

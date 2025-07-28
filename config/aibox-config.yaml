@@ -1,0 +1,298 @@
+# AI Box - Единая конфигурация
+# Центральный файл конфигурации для всех типов развертывания
+
+# Настройки развертывания
+deployment:
+  type: local  # local, server, cluster
+  environment: production
+  image_source: build  # build (собрать локально) или hub (использовать Docker Hub)
+  docker_registry: ""  # Установите для использования Docker Hub (например: your-username)
+
+# Версии
+version:
+  app: "1.0.0"
+  docker_compose: "2.20.0"
+  kubernetes: "1.28.0"
+  helm: "3.12.0"
+
+# Сервисы
+services:
+  # Frontend
+  frontend:
+    enabled: true
+    port: 5000
+    replicas:
+      local: 1
+      server: 1
+      cluster: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  
+  # API Gateway
+  gateway:
+    enabled: true
+    port: 8000
+    replicas:
+      local: 1
+      server: 1
+      cluster: 3
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    autoscaling:
+      enabled: false
+      min_replicas: 2
+      max_replicas: 10
+      target_cpu: 70
+  
+  # Ollama LLM Service
+  ollama:
+    enabled: true
+    port: 11434
+    replicas:
+      local: 1
+      server: 1
+      cluster: 1
+    models:
+      - "llama3.2:3b"
+      - "codellama:7b"
+      - "mistral:7b"
+    gpu:
+      enabled: false
+      resource_name: "nvidia.com/gpu"
+      limits: 1
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    persistence:
+      size: 50Gi
+  
+  # RAG Service
+  rag:
+    enabled: true
+    port: 8001
+    replicas:
+      local: 1
+      server: 1
+      cluster: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  
+  # AI Agents
+  agents:
+    enabled: true
+    port: 8002
+    replicas:
+      local: 1
+      server: 1
+      cluster: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+
+# Базы данных
+databases:
+  # PostgreSQL
+  postgresql:
+    enabled: true
+    port: 5432
+    database: aibox
+    username: postgres
+    password: "${POSTGRES_PASSWORD:-secure_aibox_password_2024}"
+    persistence:
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  
+  # Qdrant Vector DB
+  qdrant:
+    enabled: true
+    port: 6333
+    grpc_port: 6334
+    persistence:
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+# Мониторинг
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+    retention: 30d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  
+  grafana:
+    enabled: true
+    port: 3000
+    admin_password: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Инфраструктура
+infrastructure:
+  # Локальное развертывание
+  local:
+    docker_compose_file: docker-compose.local.yml
+    auto_install_docker: true
+    network_subnet: 172.20.0.0/16
+  
+  # Серверное развертывание
+  server:
+    ansible_host: "${ANSIBLE_HOST:-your-server.company.com}"
+    ansible_user: "${ANSIBLE_USER:-admin}"
+    ansible_ssh_key: "${ANSIBLE_SSH_KEY:-~/.ssh/id_rsa}"
+    backup_enabled: true
+    backup_schedule: "0 2 * * *"  # 2:00 каждый день
+    backup_retention_days: 30
+    firewall_enabled: true
+    ssl_enabled: false
+  
+  # Кластерное развертывание
+  cluster:
+    namespace: aibox
+    storage_class: fast-ssd
+    ingress_enabled: true
+    ingress_class: nginx
+    ingress_host: "${INGRESS_HOST:-aibox.company.com}"
+    tls_enabled: false
+    node_selector: {}
+    tolerations: []
+
+# Безопасность
+security:
+  authentication:
+    enabled: false
+    provider: local  # local, ldap, oauth
+  
+  encryption:
+    enabled: true
+    tls_version: "1.3"
+  
+  secrets:
+    manager: kubernetes  # kubernetes, vault
+    rotation_days: 90
+
+# Логирование
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  format: json
+  retention_days: 7
+  destinations:
+    - stdout
+    - file
+  
+  elasticsearch:
+    enabled: false
+    host: elasticsearch.company.com
+    port: 9200
+
+# Резервное копирование
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention:
+    daily: 7
+    weekly: 4
+    monthly: 3
+  destinations:
+    - local: /opt/aibox/backups
+    # - s3:
+    #     bucket: aibox-backups
+    #     region: us-east-1
+    # - nfs:
+    #     server: backup-server.company.com
+    #     path: /backups/aibox
+
+# Дополнительные настройки
+advanced:
+  debug_mode: false
+  performance_tuning: true
+  cache_enabled: true
+  compression_enabled: true
+  
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    requests_per_hour: 5000
+  
+  health_checks:
+    enabled: true
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+# Интеграции
+integrations:
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#aibox-alerts"
+  
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: 587
+    from_address: "aibox@company.com"
+    
+  webhook:
+    enabled: false
+    urls: []
+
+# Разработка
+development:
+  hot_reload: true
+  debug_tools: true
+  mock_data: false
+  performance_profiling: false
+
+# Метаданные
+metadata:
+  created: "2024-01-01"
+  modified: "2024-01-01"
+  maintainer: "AI Box Team"
+  documentation: "https://docs.aibox.com"
+  support: "support@aibox.com"

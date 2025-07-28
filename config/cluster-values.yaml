@@ -1,0 +1,285 @@
+# AI Box - Helm Values для кластерного развертывания
+# Настройки для production кластера
+
+global:
+  namespace: aibox
+  environment: production
+  storageClass: fast-ssd
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# API Gateway настройки
+gateway:
+  enabled: true
+  name: aibox-gateway
+  image:
+    repository: aibox/gateway
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  replicas: 3
+  
+  service:
+    type: ClusterIP
+    port: 5000
+    targetPort: 5000
+  
+  ingress:
+    enabled: true
+    className: nginx
+    host: aibox.company.com
+    tls:
+      enabled: false  # для закрытого контура
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Ollama LLM сервис
+ollama:
+  enabled: true
+  name: aibox-ollama
+  image:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicas: 2
+  
+  service:
+    type: ClusterIP
+    port: 11434
+    targetPort: 11434
+  
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 16Gi
+  
+  # GPU поддержка
+  gpu:
+    enabled: false
+    resourceName: nvidia.com/gpu
+    limits: 1
+  
+  # Модели для загрузки
+  models:
+    - llama3.1
+    - codellama
+    - mistral
+  
+  persistence:
+    enabled: true
+    storageClass: fast-ssd
+    size: 50Gi
+    accessMode: ReadWriteOnce
+
+# RAG сервис
+rag:
+  enabled: true
+  name: aibox-rag
+  image:
+    repository: aibox/rag
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  replicas: 2
+  
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 8Gi
+
+# AI Agents сервис
+agents:
+  enabled: true
+  name: aibox-agents
+  image:
+    repository: aibox/agents
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  replicas: 2
+  
+  service:
+    type: ClusterIP
+    port: 8002
+    targetPort: 8002
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# PostgreSQL база данных
+postgresql:
+  enabled: true
+  name: aibox-postgres
+  image:
+    repository: postgres
+    tag: "15"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+  
+  auth:
+    database: aibox
+    username: postgres
+    # password будет взят из secret
+  
+  persistence:
+    enabled: true
+    storageClass: fast-ssd
+    size: 20Gi
+    accessMode: ReadWriteOnce
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Qdrant векторная база данных
+qdrant:
+  enabled: true
+  name: aibox-qdrant
+  image:
+    repository: qdrant/qdrant
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 6333
+    targetPort: 6333
+  
+  persistence:
+    enabled: true
+    storageClass: fast-ssd
+    size: 20Gi
+    accessMode: ReadWriteOnce
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Мониторинг
+monitoring:
+  prometheus:
+    enabled: true
+    name: aibox-prometheus
+    image:
+      repository: prom/prometheus
+      tag: latest
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 9090
+      targetPort: 9090
+    
+    persistence:
+      enabled: true
+      storageClass: fast-ssd
+      size: 10Gi
+      accessMode: ReadWriteOnce
+    
+    retention: 30d
+    
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 4Gi
+  
+  grafana:
+    enabled: true
+    name: aibox-grafana
+    image:
+      repository: grafana/grafana
+      tag: latest
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 3000
+      targetPort: 3000
+    
+    ingress:
+      enabled: true
+      className: nginx
+      host: grafana.aibox.company.com
+      tls:
+        enabled: false
+    
+    persistence:
+      enabled: true
+      storageClass: fast-ssd
+      size: 5Gi
+      accessMode: ReadWriteOnce
+    
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Сетевые политики
+networkPolicies:
+  enabled: true
+  
+# Service Mesh (опционально)
+serviceMesh:
+  enabled: false
+  type: istio  # istio, linkerd
+
+# Бэкапы
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # каждый день в 2:00
+  retention: 30  # дней
+  
+  # S3 совместимое хранилище для бэкапов
+  s3:
+    enabled: false
+    endpoint: ""
+    bucket: ""
+    region: ""

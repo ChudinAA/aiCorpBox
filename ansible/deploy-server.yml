@@ -1,0 +1,319 @@
+---
+# AI Box - Развертывание на удаленном сервере
+# Полная автоматизация установки на single server
+
+- name: "AI Box - Серверное развертывание"
+  hosts: aibox_servers
+  become: yes
+  vars_files:
+    - vars/main.yml
+
+  pre_tasks:
+    - name: "🔍 Проверка системных требований"
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 2048
+          - ansible_facts['processor_vcpus'] >= 2
+        fail_msg: "Недостаточно ресурсов для AI Box (нужно минимум 2GB RAM, 2 CPU)"
+
+    - name: "📊 Вывод информации о системе"
+      debug:
+        msg: 
+          - "Сервер: {{ inventory_hostname }}"
+          - "ОС: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "RAM: {{ (ansible_facts['memtotal_mb'] / 1024) | round(1) }}GB"
+          - "CPU: {{ ansible_facts['processor_vcpus'] }} cores"
+
+  tasks:
+    - name: "🔄 Обновление системы"
+      apt:
+        upgrade: dist
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: "📦 Установка базовых пакетов"
+      package:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - htop
+          - net-tools
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - python3-pip
+        state: present
+
+    - name: "🐳 Установка Docker"
+      include_tasks: tasks/install-docker.yml
+
+    - name: "📦 Установка Docker SDK для Python"
+      pip:
+        name:
+          - docker
+          - docker-compose
+        state: present
+
+    - name: "📂 Создание директорий AI Box"
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - /opt/aibox
+        - /opt/aibox/config
+        - /opt/aibox/data
+        - /opt/aibox/logs
+        - /opt/aibox/backups
+        - /opt/aibox/services
+        - /opt/aibox/scripts
+
+    - name: "📥 Синхронизация файлов проекта"
+      synchronize:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: push
+        delete: yes
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=*.pyc"
+          - "--exclude=__pycache__"
+          - "--exclude=node_modules"
+          - "--exclude=.env"
+          - "--exclude=data/"
+          - "--exclude=logs/"
+      delegate_to: localhost
+      become_user: "{{ ansible_user }}"
+      loop:
+        - { src: "../services/", dest: "/opt/aibox/services/" }
+        - { src: "../scripts/", dest: "/opt/aibox/scripts/" }
+        - { src: "../config/", dest: "/opt/aibox/config/" }
+
+    - name: "📝 Копирование docker-compose файлов"
+      copy:
+        src: "{{ item }}"
+        dest: "/opt/aibox/{{ item | basename }}"
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - "../docker-compose.local.yml"
+        - "../docker-compose.prod.yml"
+
+    - name: "📝 Копирование .env.example"
+      copy:
+        src: "../.env.example"
+        dest: "/opt/aibox/.env.example"
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: "⚙️ Создание .env файла из шаблона"
+      template:
+        src: templates/env.j2
+        dest: /opt/aibox/.env
+        mode: '0600'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: "🔐 Установка прав на скрипты"
+      file:
+        path: "/opt/aibox/scripts"
+        state: directory
+        recurse: yes
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: "📝 Создание скрипта postgres-init.sql если его нет"
+      copy:
+        content: |
+          -- AI Box Database initialization
+          -- Создание базовых таблиц и схем
+          
+          -- Создание схемы для AI Box
+          CREATE SCHEMA IF NOT EXISTS aibox;
+          
+          -- Установка пути поиска
+          SET search_path TO aibox, public;
+          
+          -- Таблица для истории чатов
+          CREATE TABLE IF NOT EXISTS chat_history (
+              id SERIAL PRIMARY KEY,
+              session_id VARCHAR(255) NOT NULL,
+              user_message TEXT,
+              assistant_message TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          -- Таблица для документов RAG
+          CREATE TABLE IF NOT EXISTS documents (
+              id SERIAL PRIMARY KEY,
+              filename VARCHAR(255) NOT NULL,
+              content_type VARCHAR(100),
+              file_size INTEGER,
+              uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          -- Индексы для производительности
+          CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_history(session_id);
+          CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_history(created_at);
+          CREATE INDEX IF NOT EXISTS idx_docs_uploaded ON documents(uploaded_at);
+        dest: /opt/aibox/scripts/postgres-init.sql
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+        force: no
+
+    - name: "🔍 Определение режима развертывания"
+      set_fact:
+        deployment_mode: "{{ aibox_image_source | default('build') }}"
+        docker_registry: "{{ aibox_docker_registry | default('') }}"
+
+    - name: "🏗️ Сборка Docker образов (режим build)"
+      shell: |
+        cd /opt/aibox
+        ./scripts/build-and-push-images.sh local
+      become_user: "{{ ansible_user }}"
+      when: deployment_mode == "build"
+
+    - name: "📥 Создание docker-compose.hub.yml (режим hub)"
+      shell: |
+        cd /opt/aibox
+        export DOCKER_REGISTRY={{ docker_registry }}
+        export AIBOX_VERSION={{ aibox_version }}
+        ./scripts/deploy-manager.sh local hub
+      become_user: "{{ ansible_user }}"
+      when: deployment_mode == "hub" and docker_registry != ""
+
+    - name: "🔍 Выбор docker-compose файла"
+      set_fact:
+        compose_file: "{{ 'docker-compose.hub.yml' if (deployment_mode == 'hub' and docker_registry != '') else 'docker-compose.prod.yml' }}"
+
+    - name: "⏹️ Остановка существующих контейнеров"
+      docker_compose:
+        project_src: /opt/aibox
+        files:
+          - "{{ compose_file }}"
+        state: absent
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: "🚀 Запуск AI Box сервисов"
+      docker_compose:
+        project_src: /opt/aibox
+        files:
+          - "{{ compose_file }}"
+        build: "{{ deployment_mode == 'build' }}"
+        pull: "{{ deployment_mode == 'hub' }}"
+        state: present
+      become_user: "{{ ansible_user }}"
+
+    - name: "⏳ Ожидание готовности сервисов"
+      wait_for:
+        port: "{{ item }}"
+        host: "localhost"
+        delay: 10
+        timeout: 120
+      loop:
+        - 5000  # Frontend
+        - 8000  # Gateway
+        - 5432  # PostgreSQL
+        - 6333  # Qdrant
+        - 11434 # Ollama
+      ignore_errors: yes
+
+    - name: "🤖 Инициализация Ollama моделей"
+      shell: |
+        docker exec aibox-ollama ollama pull {{ item }}
+      become_user: "{{ ansible_user }}"
+      loop: "{{ ollama_models }}"
+      ignore_errors: yes
+
+    - name: "🔒 Настройка firewall (UFW)"
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: "{{ allowed_ports }}"
+      when: firewall_enabled and ansible_facts['os_family'] == "Debian"
+
+    - name: "🔥 Включение firewall"
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+      when: firewall_enabled and ansible_facts['os_family'] == "Debian"
+
+    - name: "⚙️ Создание systemd сервиса"
+      template:
+        src: templates/aibox.service.j2
+        dest: /etc/systemd/system/aibox.service
+        mode: '0644'
+      notify: reload systemd
+
+    - name: "🚀 Включение автозапуска AI Box"
+      systemd:
+        name: aibox
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: "✅ Проверка состояния сервисов"
+      shell: |
+        cd /opt/aibox
+        docker-compose -f {{ compose_file }} ps
+      become_user: "{{ ansible_user }}"
+      register: services_status
+
+    - name: "📊 Вывод состояния сервисов"
+      debug:
+        msg: "{{ services_status.stdout_lines }}"
+
+    - name: "🌐 Проверка доступности Frontend"
+      uri:
+        url: "http://localhost:5000"
+        method: GET
+        timeout: 10
+        status_code: [200, 201, 202, 204, 301, 302]
+      register: frontend_check
+      retries: 3
+      delay: 5
+      ignore_errors: yes
+
+    - name: "🌐 Проверка доступности Gateway API"
+      uri:
+        url: "http://localhost:8000/health"
+        method: GET
+        timeout: 10
+      register: gateway_check
+      retries: 3
+      delay: 5
+      ignore_errors: yes
+
+    - name: "📋 Информация о развертывании"
+      debug:
+        msg:
+          - "✅ AI Box успешно развернут на сервере!"
+          - "🌐 Frontend: http://{{ inventory_hostname }}:5000"
+          - "📖 API документация: http://{{ inventory_hostname }}:8000/docs" 
+          - "📊 Grafana мониторинг: http://{{ inventory_hostname }}:3000"
+          - "🔍 Prometheus метрики: http://{{ inventory_hostname }}:9090"
+          - "🔧 Управление:"
+          - "  - Логи: docker-compose -f /opt/aibox/{{ compose_file }} logs -f"
+          - "  - Перезапуск: systemctl restart aibox"
+          - "  - Статус: systemctl status aibox"
+          - "💾 Бэкап: /opt/aibox/scripts/backup.sh"
+          - "📦 Режим образов: {{ deployment_mode }}"
+          - "{% if deployment_mode == 'hub' %}🐳 Docker Registry: {{ docker_registry }}{% endif %}"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes

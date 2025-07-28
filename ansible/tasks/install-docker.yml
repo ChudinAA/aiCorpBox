@@ -1,0 +1,59 @@
+---
+# Установка Docker на различные системы
+
+- name: "🐳 Добавление GPG ключа Docker (Ubuntu/Debian)"
+  apt_key:
+    url: https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "📦 Добавление репозитория Docker (Ubuntu/Debian)"
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "🔄 Обновление списка пакетов"
+  apt:
+    update_cache: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "📦 Установка Docker (Ubuntu/Debian)"
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "📦 Установка Docker (CentOS/RHEL)"
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: "🚀 Запуск и включение Docker"
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: "👤 Добавление пользователя в группу docker"
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: "✅ Проверка Docker"
+  shell: docker --version
+  register: docker_version
+
+- name: "📊 Вывод версии Docker"
+  debug:
+    msg: "{{ docker_version.stdout }}"

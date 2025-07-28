@@ -1,0 +1,43 @@
+# Core FastAPI and server
+fastapi
+uvicorn[standard]
+
+# LangChain ecosystem - Using compatible versions
+langchain
+langchain-community
+langchain-core
+langchain-experimental
+langchain-ollama
+langgraph
+langsmith
+
+# Database
+psycopg2-binary
+sqlalchemy
+alembic
+
+# Data validation and settings
+pydantic
+pydantic-settings
+
+# HTTP and WebSocket
+requests
+aiohttp
+websockets
+
+# Task queue and caching
+redis
+celery
+
+# File handling and authentication
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Data processing
+pandas
+numpy
+
+# Monitoring and logging
+prometheus-client
+structlog

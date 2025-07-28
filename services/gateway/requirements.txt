@@ -1,0 +1,27 @@
+
+# Core FastAPI and server
+fastapi
+uvicorn[standard]
+
+# WebSocket and HTTP
+websockets
+aiohttp
+requests
+
+# Authentication and security
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# Data validation and settings
+pydantic
+pydantic-settings
+
+# Database and caching
+redis
+sqlalchemy
+psycopg2-binary
+
+# Monitoring and logging
+prometheus-client
+structlog

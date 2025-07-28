@@ -1,0 +1,64 @@
+{{- range $service := list "ollama" "rag" "agents" "gateway" }}
+{{- if index $.Values $service "enabled" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-box.fullname" $ }}-{{ $service }}
+  labels:
+    {{- include "ai-box.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
+spec:
+  type: {{ index $.Values $service "service" "type" }}
+  ports:
+    - port: {{ index $.Values $service "service" "port" }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ai-box.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.monitoring.prometheus.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-box.fullname" . }}-prometheus
+  labels:
+    {{- include "ai-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  type: {{ .Values.monitoring.prometheus.service.type }}
+  ports:
+    - port: {{ .Values.monitoring.prometheus.service.port }}
+      targetPort: 9090
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ai-box.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+{{- end }}
+
+{{- if .Values.monitoring.grafana.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-box.fullname" . }}-grafana
+  labels:
+    {{- include "ai-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.monitoring.grafana.service.type }}
+  ports:
+    - port: {{ .Values.monitoring.grafana.service.port }}
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ai-box.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+{{- end }}

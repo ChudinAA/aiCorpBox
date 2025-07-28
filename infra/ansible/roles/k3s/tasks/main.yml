@@ -1,0 +1,126 @@
+---
+- name: Check if K3s is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Download K3s installation script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: '0755'
+  when: not k3s_binary.stat.exists
+
+- name: Create K3s configuration directory
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: '0755'
+
+- name: Create K3s config file
+  template:
+    src: k3s-config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: '0644'
+  notify: restart k3s
+
+- name: Configure kernel modules for K3s
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+
+- name: Make kernel modules persistent
+  copy:
+    content: |
+      br_netfilter
+      overlay
+    dest: /etc/modules-load.d/k3s.conf
+    mode: '0644'
+
+- name: Configure sysctl for K3s
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+
+- name: Disable swap
+  shell: swapoff -a
+  changed_when: false
+
+- name: Remove swap from fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: '^[^#].*swap'
+    state: absent
+
+- name: Create K3s systemd service directory
+  file:
+    path: /etc/systemd/system/k3s.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure K3s service limits
+  copy:
+    content: |
+      [Service]
+      LimitNOFILE=1048576
+      LimitNPROC=1048576
+      LimitCORE=infinity
+      TasksMax=infinity
+      OOMScoreAdjust=-999
+    dest: /etc/systemd/system/k3s.service.d/limits.conf
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart k3s
+
+- name: Set up K3s data directory
+  file:
+    path: "{{ k3s_server_data_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Configure log rotation for K3s
+  copy:
+    content: |
+      /var/log/k3s.log {
+          daily
+          missingok
+          rotate 7
+          compress
+          notifempty
+          create 644 root root
+          postrotate
+              systemctl reload k3s || true
+          endscript
+      }
+    dest: /etc/logrotate.d/k3s
+    mode: '0644'
+
+- name: Create kubectl symlink
+  file:
+    src: /usr/local/bin/k3s
+    dest: /usr/local/bin/kubectl
+    state: link
+  when: k3s_binary.stat.exists
+
+- name: Create crictl configuration
+  copy:
+    content: |
+      runtime-endpoint: unix:///run/k3s/containerd/containerd.sock
+      image-endpoint: unix:///run/k3s/containerd/containerd.sock
+      timeout: 2
+      debug: false
+    dest: /etc/crictl.yaml
+    mode: '0644'

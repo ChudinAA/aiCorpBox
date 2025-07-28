@@ -1,0 +1,198 @@
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application configuration
+app:
+  name: ai-box
+  version: "1.0.0"
+  environment: production
+
+# Ollama LLM Service
+ollama:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 11434
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+  persistence:
+    enabled: true
+    size: 50Gi
+  models:
+    - llama3.2:3b
+    - llama3.2:1b
+
+# RAG Service
+rag:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ai-box/rag
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  config:
+    chunkSize: 1000
+    chunkOverlap: 200
+    embeddingModel: "sentence-transformers/all-MiniLM-L6-v2"
+
+# AI Agents Service
+agents:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ai-box/agents
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+# Gateway Service
+gateway:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ai-box/gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 5000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  secretKey: "your-secret-key"
+  apiToken: "your-api-token"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: ai-box.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: gateway
+            port: 5000
+  tls:
+    - secretName: ai-box-tls
+      hosts:
+        - ai-box.company.com
+
+# PostgreSQL Database
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "secure_password"
+    username: "aibox"
+    password: "secure_password"
+    database: "aibox"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
+# Qdrant Vector Database
+qdrant:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: qdrant/qdrant
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 6333
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+# Monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    service:
+      type: ClusterIP
+      port: 9090
+    persistence:
+      enabled: true
+      size: 10Gi
+  grafana:
+    enabled: true
+    service:
+      type: ClusterIP
+      port: 3000
+    adminUser: admin
+    adminPassword: admin123
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Security
+security:
+  networkPolicies:
+    enabled: true
+  podSecurityPolicy:
+    enabled: false
+  rbac:
+    create: true
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

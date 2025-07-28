@@ -1,0 +1,71 @@
+ai-box/
+├── .env                          # Глобальные переменные (модель Ollama, порты, etc)
+├── docker-compose.yml            # Однодсерверный деплой (Docker Compose)
+├── docker-compose.prod.yml       # Продакшен-конфиг (с TLS, мониторингом)
+│
+├── helm/                        # Чарты для Kubernetes
+│   ├── ai-box/
+│   │   ├── Chart.yaml           # Метаданные Helm-чарта
+│   │   ├── values.yaml          # Основные параметры (модель Ollama, реплики и т.д.)
+│   │   ├── templates/
+│   │   │   ├── deployment.yaml  # Манифесты для каждого сервиса
+│   │   │   ├── service.yaml
+│   │   │   ├── ingress.yaml     # Входной трафик (Nginx/Traefik)
+│   │   │   └── pvc.yaml         # Тома для stateful-сервисов
+│   │   └── secrets/             # Шаблоны секретов (в .gitignore)
+│   │       ├── db-password.yaml
+│   │       └── api-tokens.yaml
+│   │
+│   └── external-deps/           # Зависимости (Qdrant, PostgreSQL)
+│       ├── qdrant/
+│       └── postgresql/
+│
+├── infra/                       # Инфраструктура как код (IaC)
+│   ├── terraform/
+│   │   ├── main.tf              # Создание серверов/кластера
+│   │   ├── variables.tf         # Параметры (размер инстансов, регион)
+│   │   └── outputs.tf           # IP-адреса, credentials
+│   │
+│   ├── ansible/
+│   │   ├── inventory.ini        # Инвентаризация серверов
+│   │   ├── playbook.yml         # Установка Docker, k3s, настройка сети
+│   │   └── roles/
+│   │       ├── docker/
+│   │       └── k3s/
+│   │
+│   └── k8s/                     # Ручные манифесты (если не Helm)
+│       ├── ollama-statefulset.yaml
+│       └── qdrant-cluster.yaml
+│
+├── services/                    # Сервисы в контейнерах
+│   ├── ollama/
+│   │   ├── Dockerfile           # Кастомный образ (если нужно)
+│   │   └── models/              # Предзагруженные модели (в .gitignore)
+│   │
+│   ├── rag/
+│   │   ├── Dockerfile
+│   │   ├── app.py               # FastAPI-приложение для RAG
+│   │   └── config.yaml          # Параметры LlamaIndex
+│   │
+│   ├── agents/
+│   │   ├── Dockerfile
+│   │   ├── agents/              # LangChain-агенты
+│   │   │   ├── doc_agent.py
+│   │   │   └── db_agent.py
+│   │   └── tools/               # Кастомные Tools
+│   │
+│   ├── gateway/
+│   │   ├── Dockerfile
+│   │   ├── main.py              # FastAPI + WebSockets
+│   │   └── nginx.conf           # Конфиг для балансировки
+│   │
+│   └── monitoring/
+│       ├── prometheus.yml       # Настройка сбора метрик
+│       └── grafana-dashboards/  # JSON-дашборды
+│
+├── scripts/
+│   ├── deploy.sh                # Главный скрипт деплоя
+│   ├── migrate-to-k8s.sh        # Миграция с Compose → K8s
+│   └── load-models.sh           # Загрузка моделей в Ollama
+│
+└── README.md                    # Инструкции + схемы архитектуры

@@ -1,0 +1,116 @@
+---
+# AI Box - Подготовка Kubernetes кластера
+# Полная автоматизация установки и настройки кластера
+
+- name: "AI Box - Подготовка кластера"
+  hosts: k8s_cluster
+  become: yes
+  vars_files:
+    - vars/main.yml
+  
+  pre_tasks:
+    - name: "🔍 Проверка системных требований"
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 2048
+          - ansible_facts['processor_vcpus'] >= 2
+        fail_msg: "Недостаточно ресурсов для кластера"
+
+  tasks:
+    - name: "🔄 Обновление системы"
+      apt:
+        upgrade: dist
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: "📦 Установка базовых пакетов"
+      package:
+        name:
+          - curl
+          - wget
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: "🐳 Установка Docker"
+      include_tasks: tasks/install-docker.yml
+
+    - name: "☸️ Установка Kubernetes"
+      include_tasks: tasks/install-kubernetes.yml
+
+- name: "Инициализация master узла"
+  hosts: masters
+  become: yes
+  tasks:
+    - name: "🚀 Инициализация Kubernetes кластера"
+      shell: |
+        kubeadm init --pod-network-cidr={{ k8s_pod_network_cidr }} \
+                     --service-cidr={{ k8s_service_cidr }} \
+                     --apiserver-advertise-address={{ k8s_node_ip }}
+      register: kubeadm_init
+      failed_when: false
+
+    - name: "⚙️ Настройка kubectl для root"
+      shell: |
+        mkdir -p /root/.kube
+        cp -i /etc/kubernetes/admin.conf /root/.kube/config
+        chown root:root /root/.kube/config
+
+    - name: "⚙️ Настройка kubectl для пользователя"
+      shell: |
+        mkdir -p /home/{{ ansible_user }}/.kube
+        cp -i /etc/kubernetes/admin.conf /home/{{ ansible_user }}/.kube/config
+        chown {{ ansible_user }}:{{ ansible_user }} /home/{{ ansible_user }}/.kube/config
+
+    - name: "🌐 Установка сетевого плагина Flannel"
+      shell: kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+      become_user: "{{ ansible_user }}"
+
+    - name: "🔑 Получение токена для подключения worker узлов"
+      shell: kubeadm token create --print-join-command
+      register: kubeadm_join_command
+
+    - name: "📝 Сохранение команды подключения"
+      set_fact:
+        join_command: "{{ kubeadm_join_command.stdout }}"
+
+- name: "Подключение worker узлов"
+  hosts: workers
+  become: yes
+  tasks:
+    - name: "🔗 Подключение к кластеру"
+      shell: "{{ hostvars[groups['masters'][0]]['join_command'] }}"
+      when: hostvars[groups['masters'][0]]['join_command'] is defined
+
+- name: "Установка Helm"
+  hosts: masters
+  become: yes
+  tasks:
+    - name: "📦 Скачивание Helm"
+      get_url:
+        url: "https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz"
+        dest: "/tmp/helm.tar.gz"
+
+    - name: "📂 Распаковка Helm"
+      unarchive:
+        src: "/tmp/helm.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: "⚙️ Установка Helm"
+      copy:
+        src: "/tmp/linux-amd64/helm"
+        dest: "/usr/local/bin/helm"
+        mode: '0755'
+        remote_src: yes
+
+    - name: "✅ Проверка готовности кластера"
+      shell: kubectl get nodes
+      become_user: "{{ ansible_user }}"
+      register: cluster_status
+
+    - name: "📊 Вывод статуса кластера"
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: aibox
+description: AI Box - Enterprise AI Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - llm
+  - enterprise
+  - platform
+home: https://github.com/aibox
+sources:
+  - https://github.com/aibox
+maintainers:
+  - name: AI Box Team
+    email: support@aibox.com
+dependencies: []

@@ -1,0 +1,101 @@
+# Default values for AI Box
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+global:
+  namespace: aibox
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# AI Box Gateway
+gateway:
+  enabled: true
+  image:
+    repository: aibox/gateway
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 5000
+  ingress:
+    enabled: true
+    className: nginx
+    host: aibox.local
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Ollama LLM Service
+ollama:
+  enabled: true
+  image:
+    repository: ollama/ollama
+    tag: latest
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 11434
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 8Gi
+
+# PostgreSQL Database
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    size: 10Gi
+  auth:
+    database: aibox
+    username: postgres
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Qdrant Vector Database
+qdrant:
+  enabled: true
+  image:
+    repository: qdrant/qdrant
+    tag: latest
+  service:
+    port: 6333
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    retention: 7d
+  grafana:
+    enabled: true

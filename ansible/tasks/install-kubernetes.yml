@@ -1,0 +1,85 @@
+---
+# Установка Kubernetes на различные системы
+
+- name: "🔧 Отключение swap"
+  shell: swapoff -a
+
+- name: "🔧 Отключение swap в fstab"
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: "🌐 Загрузка модулей ядра"
+  copy:
+    content: |
+      overlay
+      br_netfilter
+    dest: /etc/modules-load.d/k8s.conf
+
+- name: "⚙️ Настройка sysctl параметров"
+  copy:
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+    dest: /etc/sysctl.d/k8s.conf
+
+- name: "🔄 Применение sysctl параметров"
+  shell: sysctl --system
+
+- name: "🔑 Добавление GPG ключа Kubernetes"
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "📦 Добавление репозитория Kubernetes"
+  apt_repository:
+    repo: "deb https://apt.kubernetes.io/ kubernetes-xenial main"
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "🔄 Обновление списка пакетов"
+  apt:
+    update_cache: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "📦 Установка Kubernetes компонентов"
+  apt:
+    name:
+      - kubelet={{ k8s_version }}-00
+      - kubeadm={{ k8s_version }}-00
+      - kubectl={{ k8s_version }}-00
+    state: present
+    allow_downgrade: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "🔒 Блокировка обновлений Kubernetes пакетов"
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: "🚀 Запуск и включение kubelet"
+  systemd:
+    name: kubelet
+    state: started
+    enabled: yes
+
+- name: "✅ Проверка версий"
+  shell: "{{ item }} --version"
+  loop:
+    - kubeadm
+    - kubelet
+    - kubectl
+  register: k8s_versions
+
+- name: "📊 Вывод версий Kubernetes"
+  debug:
+    msg: "{{ item.stdout }}"
+  loop: "{{ k8s_versions.results }}"

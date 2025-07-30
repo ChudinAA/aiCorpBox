@@ -1,0 +1,18 @@
+---
+# AI Box - Inventory для серверного развертывания
+# Настройте ваши серверы здесь
+
+aibox_servers:
+  hosts:
+    # Замените на ваш сервер
+    production-server.company.com:
+      ansible_user: admin
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      # или используйте пароль:
+      # ansible_ssh_pass: your_password
+      # ansible_become_pass: your_sudo_password
+  
+  vars:
+    # Общие переменные для всех серверов
+    aibox_environment: production
+    aibox_version: "1.0.0"

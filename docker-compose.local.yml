@@ -1,0 +1,146 @@
+version: '3.8'
+
+# AI Box - Локальное развертывание
+# Упрощенная версия для быстрого старта
+
+services:
+  # AI Box Gateway - единая точка входа
+  gateway:
+    image: python:3.11-slim
+    container_name: aibox-gateway
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r requirements.txt &&
+        python demo_gateway.py
+      "
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
+      - QDRANT_URL=http://qdrant:6333
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Ollama - локальные языковые модели
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aibox-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # PostgreSQL - основная база данных
+  postgres:
+    image: postgres:15
+    container_name: aibox-postgres
+    environment:
+      POSTGRES_DB: aibox
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Qdrant - векторная база данных
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: aibox-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Prometheus - сбор метрик
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aibox-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+  # Grafana - дашборды мониторинга
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aibox-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - aibox-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    driver: local
+  qdrant-data:
+    driver: local
+  ollama-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  aibox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

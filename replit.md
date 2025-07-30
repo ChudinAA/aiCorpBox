@@ -2,32 +2,37 @@
 
 ## Overview
 
-AI Box is a comprehensive, containerized AI platform designed for enterprise deployment. It provides a complete solution for deploying and managing AI services including local LLMs (via Ollama), RAG (Retrieval-Augmented Generation), and AI agents. The system is built with a microservices architecture using Docker containers and can be deployed either via Docker Compose for single-server deployments or Kubernetes/Helm for production environments.
+AI Box is a simplified, one-click deployable AI platform for closed corporate environments. The project has been restructured for maximum simplicity and ease of deployment with progressive complexity: local machine → single server → cluster. Uses unified configuration and Ansible automation for all deployment types.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Deployment priority: One-click deployment ("развертывание по кнопке") in any infrastructure
+Architecture preference: Simple-to-complex progression (local → server → cluster deployment)
+Technology focus: Ansible as primary automation tool for all deployment types
+Design philosophy: Maximum simplicity in project structure and logic
 
-## System Architecture
+## Simplified System Architecture
 
-The platform follows a microservices architecture with the following core components:
+Restructured for progressive deployment complexity with unified automation:
 
-### Gateway Layer
-- **API Gateway** (Port 5000): Unified entry point handling both WebSocket and REST API requests
-- **Load Balancer**: Nginx/Ingress for traffic distribution and SSL termination
+### Progressive Deployment Levels
+1. **Local Machine**: Single command deployment with Docker Compose
+2. **Single Server**: Ansible automation with Docker on remote server
+3. **Cluster**: Kubernetes + Helm + Ansible for enterprise scale
 
-### AI Services Layer
-- **Ollama Service** (Port 11434): Local Large Language Model hosting and inference
-- **RAG Service** (Port 8001): Document processing and retrieval using LlamaIndex + Qdrant
-- **AI Agents Service** (Port 8002): Intelligent agents using LangChain with custom tools
+### Core Components (same across all deployment types)
+- **API Gateway** (Port 5000): Main entry point with demo interface
+- **Ollama Service** (Port 11434): Local LLM hosting
+- **PostgreSQL**: Application database
+- **Qdrant**: Vector database (for full deployment)
+- **Monitoring**: Prometheus + Grafana stack
 
-### Data Layer
-- **PostgreSQL**: Primary application database for conversations, metadata, and structured data
-- **Qdrant**: Vector database for document embeddings and semantic search
-
-### Monitoring Layer
-- **Prometheus**: Metrics collection and monitoring
-- **Grafana**: Visualization dashboards and alerting
+### Deployment Automation
+- **Unified Config**: Single `config/aibox-config.yaml` for all deployments
+- **One-Click Scripts**: `./quick-deploy.sh [local|server|cluster]`
+- **Ansible Automation**: All infrastructure setup automated
+- **Progressive Complexity**: Each level builds on the previous
 
 ## Key Components
 

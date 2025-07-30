@@ -1,0 +1,87 @@
+---
+# AI Box - Основные переменные для Ansible
+# Единые настройки для всех типов развертывания
+
+# Основные настройки AI Box
+aibox_version: "1.0.0"
+aibox_user: "aibox"
+aibox_home: "/opt/aibox"
+aibox_environment: "{{ deployment_environment | default('development') }}"
+
+# Порты сервисов
+gateway_port: 5000
+ollama_port: 11434
+rag_port: 8001
+agents_port: 8002
+postgres_port: 5432
+qdrant_port: 6333
+prometheus_port: 9090
+grafana_port: 3000
+
+# AI модели для Ollama
+ollama_models:
+  - "llama3.1"
+  - "codellama"
+  - "mistral"
+
+# Настройки базы данных
+postgres_db: "aibox"
+postgres_user: "postgres"
+postgres_password: "{{ vault_postgres_password | default('aibox_default_password_2024') }}"
+
+# Настройки Docker
+docker_compose_version: "v2.21.0"
+docker_network: "aibox-network"
+
+# Настройки мониторинга
+grafana_admin_password: "{{ vault_grafana_password | default('admin') }}"
+prometheus_retention: "30d"
+
+# Системные требования
+min_memory_mb: 4096
+min_cpu_cores: 2
+min_disk_gb: 20
+
+# Настройки безопасности
+ssl_enabled: false  # для закрытой корпоративной сети
+firewall_enabled: true
+allowed_ports:
+  - "{{ gateway_port }}"
+  - "{{ grafana_port }}"
+  - "22"  # SSH
+
+# Настройки бэкапа
+backup_enabled: true
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"  # каждый день в 2:00
+
+# Пути к файлам
+config_dir: "{{ aibox_home }}/config"
+data_dir: "{{ aibox_home }}/data"
+logs_dir: "{{ aibox_home }}/logs"
+backup_dir: "{{ aibox_home }}/backups"
+
+# Docker образы
+docker_images:
+  gateway: "aibox/gateway:{{ aibox_version }}"
+  rag: "aibox/rag:{{ aibox_version }}"
+  agents: "aibox/agents:{{ aibox_version }}"
+  ollama: "ollama/ollama:latest"
+  postgres: "postgres:15"
+  qdrant: "qdrant/qdrant:latest"
+  prometheus: "prom/prometheus:latest"
+  grafana: "grafana/grafana:latest"
+  nginx: "nginx:alpine"
+
+# Кластерные настройки (для Kubernetes)
+k8s_namespace: "aibox"
+k8s_storage_class: "fast-ssd"
+k8s_ingress_class: "nginx"
+helm_chart_version: "{{ aibox_version }}"
+
+# Настройки автомасштабирования
+autoscaling_enabled: false
+min_replicas: 1
+max_replicas: 5
+target_cpu_utilization: 70
+target_memory_utilization: 80

@@ -1,0 +1,210 @@
+---
+# AI Box - Развертывание на удаленном сервере
+# Полная автоматизация установки и настройки в корпоративной среде
+
+- name: "AI Box - Развертывание на сервере"
+  hosts: aibox_servers
+  become: yes
+  vars_files:
+    - vars/main.yml
+  
+  pre_tasks:
+    - name: "🔍 Сбор информации о системе"
+      setup:
+    
+    - name: "📋 Проверка системных требований"
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 4096
+          - ansible_facts['processor_vcpus'] >= 2
+        fail_msg: "Недостаточно ресурсов. Требуется минимум 4GB RAM и 2 CPU cores"
+  
+  tasks:
+    - name: "🔄 Обновление системы"
+      package:
+        name: "*"
+        state: latest
+      when: ansible_facts['os_family'] == "RedHat"
+    
+    - name: "🔄 Обновление системы (Ubuntu/Debian)"
+      apt:
+        upgrade: dist
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+    
+    - name: "📦 Установка необходимых пакетов"
+      package:
+        name:
+          - curl
+          - wget
+          - git
+          - htop
+          - unzip
+          - python3
+          - python3-pip
+        state: present
+    
+    - name: "🐳 Установка Docker"
+      include_tasks: tasks/install-docker.yml
+    
+    - name: "🔥 Настройка брандмауэра"
+      include_tasks: tasks/configure-firewall.yml
+    
+    - name: "👤 Создание пользователя для AI Box"
+      user:
+        name: "{{ aibox_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ aibox_home }}"
+        create_home: yes
+        groups: docker
+    
+    - name: "📁 Создание структуры директорий"
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ aibox_user }}"
+        group: "{{ aibox_user }}"
+        mode: '0755'
+      loop:
+        - "{{ aibox_home }}/app"
+        - "{{ aibox_home }}/data"
+        - "{{ aibox_home }}/logs"
+        - "{{ aibox_home }}/config"
+        - "{{ aibox_home }}/backups"
+        - "{{ aibox_home }}/ssl"
+    
+    - name: "📤 Копирование файлов проекта"
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ aibox_home }}/app/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=__pycache__"
+          - "--exclude=.pytest_cache"
+          - "--exclude=node_modules"
+    
+    - name: "⚙️ Генерация конфигурационных файлов"
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: "{{ aibox_user }}"
+        group: "{{ aibox_user }}"
+        mode: '0644'
+      loop:
+        - { src: "docker-compose.server.yml.j2", dest: "{{ aibox_home }}/app/docker-compose.yml" }
+        - { src: "nginx.conf.j2", dest: "{{ aibox_home }}/config/nginx.conf" }
+        - { src: "prometheus.yml.j2", dest: "{{ aibox_home }}/config/prometheus.yml" }
+    
+    - name: "🔑 Создание файла переменных окружения"
+      template:
+        src: ".env.server.j2"
+        dest: "{{ aibox_home }}/app/.env"
+        owner: "{{ aibox_user }}"
+        group: "{{ aibox_user }}"
+        mode: '0600'
+    
+    - name: "🏗️ Сборка Docker образов"
+      docker_image:
+        name: "{{ item.name }}"
+        build:
+          path: "{{ aibox_home }}/app/{{ item.path }}"
+          dockerfile: "{{ item.dockerfile }}"
+        source: build
+        force_source: yes
+      loop:
+        - { name: "aibox/gateway", path: ".", dockerfile: "Dockerfile.gateway" }
+        - { name: "aibox/rag", path: "services/rag", dockerfile: "Dockerfile" }
+        - { name: "aibox/agents", path: "services/agents", dockerfile: "Dockerfile" }
+    
+    - name: "📥 Загрузка внешних Docker образов"
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      loop:
+        - "ollama/ollama:latest"
+        - "postgres:15"
+        - "qdrant/qdrant:latest"
+        - "prom/prometheus:latest"
+        - "grafana/grafana:latest"
+        - "nginx:alpine"
+    
+    - name: "🚀 Запуск AI Box"
+      docker_compose:
+        project_src: "{{ aibox_home }}/app"
+        state: present
+        pull: yes
+      become_user: "{{ aibox_user }}"
+    
+    - name: "⏱️ Ожидание готовности сервисов"
+      uri:
+        url: "http://localhost:{{ gateway_port }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      retries: 60
+      delay: 10
+      until: health_check.status == 200
+    
+    - name: "🎯 Загрузка AI моделей"
+      uri:
+        url: "http://localhost:{{ ollama_port }}/api/pull"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item }}"
+        timeout: 600
+      loop: "{{ ollama_models }}"
+      ignore_errors: yes
+    
+    - name: "🔄 Настройка автозапуска"
+      template:
+        src: "aibox.service.j2"
+        dest: "/etc/systemd/system/aibox.service"
+        mode: '0644'
+      notify: 
+        - reload systemd
+        - enable aibox
+    
+    - name: "📊 Настройка логирования"
+      template:
+        src: "logrotate.j2"
+        dest: "/etc/logrotate.d/aibox"
+        mode: '0644'
+    
+    - name: "🔄 Настройка cron для бэкапов"
+      cron:
+        name: "AI Box backup"
+        hour: "2"
+        minute: "0"
+        job: "{{ aibox_home }}/app/scripts/backup.sh"
+        user: "{{ aibox_user }}"
+    
+    - name: "✅ Финальная проверка всех сервисов"
+      uri:
+        url: "http://localhost:{{ gateway_port }}/api/services/status"
+        method: GET
+      register: final_status
+    
+    - name: "📊 Информация о развертывании"
+      debug:
+        msg:
+          - "🎉 AI Box успешно развернут на сервере {{ inventory_hostname }}!"
+          - "🌐 Веб-интерфейс: http://{{ inventory_hostname }}:{{ gateway_port }}"
+          - "📚 API документация: http://{{ inventory_hostname }}:{{ gateway_port }}/docs"
+          - "📊 Мониторинг: http://{{ inventory_hostname }}:{{ grafana_port }}"
+          - "❤️  Здоровье системы: http://{{ inventory_hostname }}:{{ gateway_port }}/health"
+          - "📁 Логи: {{ aibox_home }}/logs/"
+          - "💾 Данные: {{ aibox_home }}/data/"
+  
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+    
+    - name: enable aibox
+      systemd:
+        name: aibox
+        enabled: yes
+        state: started

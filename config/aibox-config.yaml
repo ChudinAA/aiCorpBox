@@ -1,0 +1,138 @@
+# AI Box - Единая конфигурация для всех типов развертывания
+# Простая настройка для развертывания в любой инфраструктуре
+
+deployment:
+  type: local  # local, server, cluster
+  environment: development  # development, production
+
+# Конфигурация сервисов AI Box
+services:
+  gateway:
+    port: 5000
+    replicas: 1
+    image: "aibox/gateway:latest"
+    
+  ollama:
+    port: 11434
+    replicas: 1
+    image: "ollama/ollama:latest"
+    models:
+      - "llama3.1"
+      - "codellama"
+      - "mistral"
+    gpu_enabled: true
+    
+  rag:
+    port: 8001
+    replicas: 1
+    image: "aibox/rag:latest"
+    
+  agents:
+    port: 8002
+    replicas: 1
+    image: "aibox/agents:latest"
+    
+  database:
+    port: 5432
+    type: postgresql
+    image: "postgres:15"
+    database_name: "aibox"
+    username: "postgres"
+    # password будет взят из secrets
+    
+  vector_db:
+    port: 6333
+    type: qdrant
+    image: "qdrant/qdrant:latest"
+    
+  monitoring:
+    prometheus_port: 9090
+    grafana_port: 3000
+    prometheus_image: "prom/prometheus:latest"
+    grafana_image: "grafana/grafana:latest"
+
+# Конфигурация инфраструктуры
+infrastructure:
+  # Локальное развертывание (Docker Compose)
+  local:
+    docker_compose: true
+    auto_install_docker: true
+    auto_pull_images: true
+    network_name: "aibox-network"
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+      - "qdrant-data:/qdrant/storage"
+      - "ollama-data:/root/.ollama"
+      - "prometheus-data:/prometheus"
+      - "grafana-data:/var/lib/grafana"
+  
+  # Развертывание на сервере (Ansible + Docker)
+  server:
+    ansible_host: "your-server.company.com"
+    ansible_user: "admin"
+    ssh_key_path: "~/.ssh/id_rsa"
+    docker_install: true
+    firewall_configure: true
+    ssl_enabled: false  # для развертывания в закрытом контуре
+    backup_enabled: true
+    monitoring_enabled: true
+  
+  # Кластерное развертывание (Kubernetes + Helm + Ansible)
+  cluster:
+    kubernetes: true
+    helm: true
+    namespace: "aibox"
+    ingress_enabled: true
+    load_balancer: "nginx"
+    storage_class: "fast-ssd"
+    nodes:
+      - "node1.company.com"
+      - "node2.company.com"
+      - "node3.company.com"
+    master_node: "master.company.com"
+    ansible_user: "admin"
+    ssh_key_path: "~/.ssh/id_rsa"
+
+# Настройки безопасности
+security:
+  ssl_enabled: false  # для закрытого контура
+  auth_enabled: true
+  admin_password: "admin"  # будет взят из secrets в production
+  api_key_required: false
+  cors_enabled: true
+  allowed_origins:
+    - "http://localhost:*"
+    - "http://127.0.0.1:*"
+    - "http://192.168.*.*"
+    - "http://10.*.*.*"
+
+# Настройки ресурсов
+resources:
+  # Минимальные требования
+  minimum:
+    cpu: "2 cores"
+    memory: "4GB"
+    disk: "20GB"
+  
+  # Рекомендуемые для production
+  recommended:
+    cpu: "8 cores"
+    memory: "16GB"
+    disk: "100GB"
+    gpu: "optional"
+
+# Настройки мониторинга
+monitoring:
+  enabled: true
+  metrics_retention: "30d"
+  log_level: "INFO"
+  health_check_interval: "30s"
+  backup_interval: "24h"
+
+# Настройки автоматического масштабирования (только для кластера)
+autoscaling:
+  enabled: false
+  min_replicas: 1
+  max_replicas: 5
+  target_cpu_utilization: 70
+  target_memory_utilization: 80

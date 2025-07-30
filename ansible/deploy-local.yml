@@ -1,0 +1,112 @@
+---
+# AI Box - Локальное развертывание через Ansible
+# Автоматическая установка и настройка всех компонентов на локальной машине
+
+- name: "AI Box - Локальное развертывание"
+  hosts: localhost
+  connection: local
+  become: yes
+  vars_files:
+    - vars/main.yml
+  
+  tasks:
+    - name: "📋 Проверка системных требований"
+      include_tasks: tasks/check-requirements.yml
+    
+    - name: "🐳 Установка Docker и Docker Compose"
+      include_tasks: tasks/install-docker.yml
+      when: ansible_facts['os_family'] == "Debian" or ansible_facts['os_family'] == "RedHat"
+    
+    - name: "📁 Создание рабочих директорий"
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ aibox_home }}/data"
+        - "{{ aibox_home }}/logs"
+        - "{{ aibox_home }}/config"
+        - "{{ aibox_home }}/backups"
+    
+    - name: "⚙️ Копирование конфигурационных файлов"
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '0644'
+      loop:
+        - { src: "docker-compose.local.yml.j2", dest: "{{ aibox_home }}/docker-compose.yml" }
+        - { src: "prometheus.yml.j2", dest: "{{ aibox_home }}/config/prometheus.yml" }
+        - { src: "grafana-datasources.yml.j2", dest: "{{ aibox_home }}/config/grafana-datasources.yml" }
+    
+    - name: "🔑 Создание файла с переменными окружения"
+      template:
+        src: ".env.j2"
+        dest: "{{ aibox_home }}/.env"
+        mode: '0600'
+    
+    - name: "📥 Загрузка Docker образов"
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      loop:
+        - "ollama/ollama:latest"
+        - "postgres:15"
+        - "qdrant/qdrant:latest"
+        - "prom/prometheus:latest"
+        - "grafana/grafana:latest"
+        - "nginx:alpine"
+      
+    - name: "🏗️ Сборка кастомных образов AI Box"
+      docker_image:
+        name: "{{ item.name }}"
+        build:
+          path: "{{ item.path }}"
+          dockerfile: "{{ item.dockerfile }}"
+        source: build
+        force_source: yes
+      loop:
+        - { name: "aibox/gateway", path: ".", dockerfile: "Dockerfile.gateway" }
+        - { name: "aibox/rag", path: "./services/rag", dockerfile: "Dockerfile" }
+        - { name: "aibox/agents", path: "./services/agents", dockerfile: "Dockerfile" }
+    
+    - name: "🚀 Запуск AI Box с помощью Docker Compose"
+      docker_compose:
+        project_src: "{{ aibox_home }}"
+        state: present
+        pull: yes
+    
+    - name: "⏱️ Ожидание готовности сервисов"
+      uri:
+        url: "http://localhost:{{ gateway_port }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      retries: 30
+      delay: 10
+      until: health_check.status == 200
+    
+    - name: "🎯 Загрузка AI моделей в Ollama"
+      uri:
+        url: "http://localhost:{{ ollama_port }}/api/pull"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item }}"
+      loop: "{{ ollama_models }}"
+      ignore_errors: yes
+    
+    - name: "✅ Проверка статуса всех сервисов"
+      uri:
+        url: "http://localhost:{{ gateway_port }}/api/services/status"
+        method: GET
+      register: services_status
+    
+    - name: "📊 Отображение информации о развертывании"
+      debug:
+        msg:
+          - "🎉 AI Box успешно развернут локально!"
+          - "🌐 Веб-интерфейс: http://localhost:{{ gateway_port }}"
+          - "📚 API документация: http://localhost:{{ gateway_port }}/docs"
+          - "📊 Grafana: http://localhost:{{ grafana_port }} (admin/admin)"
+          - "🔍 Prometheus: http://localhost:{{ prometheus_port }}"
+          - "❤️  Статус здоровья: http://localhost:{{ gateway_port }}/health"

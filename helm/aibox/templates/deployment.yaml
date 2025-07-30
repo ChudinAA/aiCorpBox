@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-gateway
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      containers:
+      - name: gateway
+        image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+        imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 5000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.gateway.resources | nindent 12 }}
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "aibox.fullname" . }}-secrets
+              key: database-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-rag
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rag
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: rag
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: rag
+    spec:
+      containers:
+      - name: rag
+        image: "aibox/rag:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8001
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 200m
+            memory: 1Gi
+          limits:
+            cpu: 1
+            memory: 4Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aibox.fullname" . }}-agents
+  labels:
+    {{- include "aibox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aibox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agents
+  template:
+    metadata:
+      labels:
+        {{- include "aibox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agents
+    spec:
+      containers:
+      - name: agents
+        image: "aibox/agents:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8002
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi

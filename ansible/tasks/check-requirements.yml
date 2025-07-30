@@ -1,0 +1,45 @@
+---
+# Check system requirements for AI Box deployment
+- name: Check if Docker is installed
+  command: docker --version
+  register: docker_check
+  failed_when: false
+  changed_when: false
+
+- name: Check if Docker Compose is installed
+  command: docker-compose --version
+  register: docker_compose_check
+  failed_when: false
+  changed_when: false
+
+- name: Check available disk space
+  shell: df -h / | awk 'NR==2 {print $4}'
+  register: disk_space
+  changed_when: false
+
+- name: Check available memory
+  shell: free -h | awk 'NR==2 {print $7}'
+  register: memory_available
+  changed_when: false
+
+- name: Check CPU count
+  shell: nproc
+  register: cpu_count
+  changed_when: false
+
+- name: Display system requirements check
+  debug:
+    msg:
+      - "Docker installed: {{ 'Yes' if docker_check.rc == 0 else 'No' }}"
+      - "Docker Compose installed: {{ 'Yes' if docker_compose_check.rc == 0 else 'No' }}"
+      - "Available disk space: {{ disk_space.stdout }}"
+      - "Available memory: {{ memory_available.stdout }}"
+      - "CPU cores: {{ cpu_count.stdout }}"
+
+- name: Fail if minimum requirements not met
+  fail:
+    msg: "System does not meet minimum requirements"
+  when: 
+    - docker_check.rc != 0 or docker_compose_check.rc != 0
+    - (disk_space.stdout | regex_replace('G', '') | int) < 10
+    - (memory_available.stdout | regex_replace('G', '') | int) < 2

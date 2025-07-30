@@ -108,6 +108,10 @@ Completely automated deployment system:
 - ✅ Consolidated quick-deploy.sh as single entry point for all deployment types
 - ✅ Removed unused files and streamlined configuration management
 - ✅ Updated deploy.py to support utilities only, avoiding duplication
+- ✅ **RESTORED** services folder with all service Dockerfiles and source code
+- ✅ **ADDED** missing ansible/tasks/check-requirements.yml for system validation
+- ✅ **COMPLETED** helm charts for Kubernetes deployment (templates, helpers, secrets)
+- ✅ **UNIFIED** docker-compose files: removed duplicate docker-compose.yml, kept local and prod versions
 
 ### Configuration Management
 - **Unified Config**: Single `config/aibox-config.yaml` for all deployment types

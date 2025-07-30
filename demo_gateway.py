@@ -427,7 +427,7 @@ async def main_page():
         <div class="deployment-info">
             <h4>🚀 Deployment Information</h4>
             <p><strong>Current Mode:</strong> Development Demo (no Docker containers running)</p>
-            <p><strong>Database:</strong> Connected to Replit PostgreSQL</p>
+            <p><strong>Database:</strong> Connected to PostgreSQL</p>
             <p><strong>Production Deployment:</strong> Use <code>./scripts/deploy.sh</code> for full Docker Compose, Kubernetes, or Ansible deployment</p>
             <p><strong>Migration:</strong> Use <code>./scripts/migrate-to-k8s.sh</code> to migrate from Docker Compose to Kubernetes</p>
         </div>

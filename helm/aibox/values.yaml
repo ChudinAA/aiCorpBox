@@ -101,17 +101,6 @@ monitoring:
     enabled: true
 replicaCount: 1
 
-# Gateway service
-gateway:
-  image:
-    repository: aibox/gateway
-    pullPolicy: IfNotPresent
-    tag: "1.0.0"
-  replicas: 2
-  service:
-    type: ClusterIP
-    port: 5000
-
 # RAG service
 rag:
   image:
@@ -133,13 +122,3 @@ agents:
   service:
     type: ClusterIP
     port: 8002
-
-# Ollama service
-ollama:
-  image:
-    repository: aibox/ollama
-    pullPolicy: IfNotPresent
-    tag: "1.0.0"
-  service:
-    type: ClusterIP
-    port: 11434

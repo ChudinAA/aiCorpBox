@@ -13,9 +13,10 @@ llama-index-llms-ollama
 qdrant-client
 
 # ML and embeddings
-sentence-transformers
-transformers
-torch
+sentence-transformers>=2.2.0
+transformers>=4.21.0
+torch>=1.13.0
+datasets
 
 # Database
 psycopg2-binary

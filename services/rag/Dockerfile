@@ -20,11 +20,13 @@ RUN groupadd -r raguser && useradd -r -g raguser raguser
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
 # Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download embedding models
+COPY download_models.py .
+RUN python download_models.py || echo "Model download failed, will retry at runtime"
 
 # Copy application files
 COPY app.py config.yaml ./

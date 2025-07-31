@@ -14,7 +14,7 @@ llm:
 
 # Embeddings Configuration
 embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
+  model: "BAAI/bge-small-en"
   dimension: 384
   batch_size: 32
   cache_folder: "/app/embeddings_cache"

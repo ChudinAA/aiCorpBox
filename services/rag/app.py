@@ -138,11 +138,45 @@ async def lifespan(app: FastAPI):
             temperature=config["llm"]["temperature"]
         )
         
-        # Initialize embeddings
-        embed_model = HuggingFaceEmbedding(
-            model_name=config["embeddings"]["model"],
-            cache_folder="/app/embeddings_cache"
-        )
+        # Initialize embeddings with fallback
+        offline_mode = os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
+        
+        if offline_mode:
+            logger.info("Running in offline mode, using cached models only")
+        
+        try:
+            embed_model = HuggingFaceEmbedding(
+                model_name=config["embeddings"]["model"],
+                cache_folder="/app/embeddings_cache"
+            )
+            logger.info(f"Successfully loaded embedding model: {config['embeddings']['model']}")
+        except Exception as e:
+            logger.warning(f"Failed to load primary embedding model: {e}")
+            logger.info("Falling back to alternative embedding models")
+            
+            # Try fallback models in order of preference
+            fallback_models = [
+                "sentence-transformers/all-mpnet-base-v2",
+                "BAAI/bge-small-en",
+                "sentence-transformers/all-MiniLM-L6-v2"
+            ]
+            
+            embed_model = None
+            for fallback_model in fallback_models:
+                try:
+                    embed_model = HuggingFaceEmbedding(
+                        model_name=fallback_model,
+                        cache_folder="/app/embeddings_cache"
+                    )
+                    logger.info(f"Successfully loaded fallback embedding model: {fallback_model}")
+                    break
+                except Exception as fallback_error:
+                    logger.warning(f"Failed to load {fallback_model}: {fallback_error}")
+                    continue
+            
+            if embed_model is None:
+                logger.error("All embedding models failed to load")
+                raise Exception("No embedding model could be loaded")
         
         # Configure global settings
         Settings.llm = llm

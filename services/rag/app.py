@@ -108,15 +108,20 @@ async def lifespan(app: FastAPI):
         try:
             qdrant_client.get_collection(collection_name)
             logger.info(f"Collection '{collection_name}' already exists")
-        except Exception:
-            qdrant_client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=config["embeddings"]["dimension"],
-                    distance=Distance.COSINE
+        except Exception as e:
+            if "doesn't exist" in str(e) or "Not found" in str(e):
+                logger.info(f"Collection '{collection_name}' not found, creating...")
+                qdrant_client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(
+                        size=config["embeddings"]["dimension"],
+                        distance=Distance.COSINE
+                    )
                 )
-            )
-            logger.info(f"Created collection '{collection_name}'")
+                logger.info(f"Created collection '{collection_name}'")
+            else:
+                logger.error(f"Error checking collection: {e}")
+                raise
         
         # Initialize vector store
         vector_store = QdrantVectorStore(
@@ -235,9 +240,11 @@ async def health_check():
     
     # Check Qdrant
     try:
-        qdrant_client.get_collections()
+        collections = qdrant_client.get_collections()
         services["qdrant"] = "healthy"
-    except Exception:
+        logger.debug(f"Qdrant collections: {[c.name for c in collections.collections]}")
+    except Exception as e:
+        logger.error(f"Qdrant health check failed: {e}")
         services["qdrant"] = "unhealthy"
     
     # Check Ollama

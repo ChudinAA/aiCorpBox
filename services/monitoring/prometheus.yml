@@ -30,7 +30,7 @@ scrape_configs:
   # Gateway service metrics
   - job_name: 'ai-box-gateway'
     static_configs:
-      - targets: ['host.docker.internal:5000']
+      - targets: ['gateway:5000']
     scrape_interval: 15s
     metrics_path: /health
     scrape_timeout: 10s
@@ -39,7 +39,7 @@ scrape_configs:
   # RAG service metrics
   - job_name: 'ai-box-rag'
     static_configs:
-      - targets: ['host.docker.internal:8001']
+      - targets: ['rag:8001']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
@@ -47,7 +47,7 @@ scrape_configs:
   # Agents service metrics
   - job_name: 'ai-box-agents'
     static_configs:
-      - targets: ['host.docker.internal:8002']
+      - targets: ['agents:8002']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
@@ -55,7 +55,7 @@ scrape_configs:
   # Ollama service metrics
   - job_name: 'ai-box-ollama'
     static_configs:
-      - targets: ['host.docker.internal:11434']
+      - targets: ['ollama:11434']
     scrape_interval: 60s
     metrics_path: /api/tags
     scrape_timeout: 30s
@@ -63,7 +63,7 @@ scrape_configs:
   # PostgreSQL monitoring (using postgres_exporter)
   - job_name: 'ai-box-postgres'
     static_configs:
-      - targets: ['host.docker.internal:5432']
+      - targets: ['postgres:5432']
     scrape_interval: 30s
     scrape_timeout: 10s
 

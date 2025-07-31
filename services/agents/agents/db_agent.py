@@ -46,7 +46,7 @@ class TableInfoInput(BaseModel):
 # Database connection
 def get_database_url():
     """Get database connection URL from environment"""
-    return f"postgresql://{os.getenv('POSTGRES_USER', 'aibox')}:{os.getenv('POSTGRES_PASSWORD', 'secure_password')}@{os.getenv('POSTGRES_HOST', 'postgres')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'aibox')}"
+    return os.getenv('DATABASE_URL', 'postgresql://postgres:password@postgres:5432/aibox')
 
 def get_db_engine():
     """Get database engine"""

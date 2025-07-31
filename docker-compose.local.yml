@@ -77,6 +77,11 @@ services:
       - "8002:8002"
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=aibox
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
       - OLLAMA_API_BASE=http://ollama:11434
       - ENVIRONMENT=development
     depends_on:

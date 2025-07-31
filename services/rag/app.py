@@ -43,7 +43,7 @@ with open("/app/config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 # Database setup
-DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'aibox')}:{os.getenv('POSTGRES_PASSWORD', 'secure_password')}@{os.getenv('POSTGRES_HOST', 'postgres')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'aibox')}"
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:password@postgres:5432/aibox')
 
 engine = sa.create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -11,9 +11,8 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.tools import BaseTool, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferWindowMemory
 from langchain_core.callbacks.base import BaseCallbackHandler
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 import requests
 import json
@@ -189,13 +188,8 @@ class DocumentAgent:
             analyze_document_content
         ]
         
-        self.memory = ConversationBufferWindowMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            k=10
-        )
-        
         self.callback_handler = DocumentAgentCallbackHandler()
+        self.chat_history = []  # Simple list to store conversation history
         
         # Create prompt template
         self.prompt = ChatPromptTemplate.from_messages([
@@ -216,7 +210,6 @@ class DocumentAgent:
         self.agent_executor = AgentExecutor(
             agent=self.agent,
             tools=self.tools,
-            memory=self.memory,
             callbacks=[self.callback_handler],
             verbose=True,
             max_iterations=5,
@@ -257,16 +250,28 @@ For complex queries, break them down into smaller searches and combine the resul
         try:
             start_time = datetime.now()
             
+            # Add user message to chat history
+            self.chat_history.append(HumanMessage(content=message))
+            
             # Execute agent
             result = await self.agent_executor.ainvoke({
-                "input": message
+                "input": message,
+                "chat_history": self.chat_history
             })
+            
+            # Add AI response to chat history
+            answer = result.get("output", "")
+            self.chat_history.append(AIMessage(content=answer))
+            
+            # Keep only last 20 messages (10 exchanges)
+            if len(self.chat_history) > 20:
+                self.chat_history = self.chat_history[-20:]
             
             end_time = datetime.now()
             processing_time = (end_time - start_time).total_seconds()
             
             return {
-                "answer": result.get("output", ""),
+                "answer": answer,
                 "agent_type": "document",
                 "session_id": session_id,
                 "processing_time": processing_time,
@@ -300,16 +305,15 @@ For complex queries, break them down into smaller searches and combine the resul
     
     def reset_memory(self, session_id: str = None):
         """Reset the agent's conversation memory"""
-        self.memory.clear()
+        self.chat_history.clear()
         logger.info(f"Memory reset for document agent (session: {session_id})")
     
     def get_conversation_history(self, session_id: str = None) -> List[Dict[str, Any]]:
         """Get the conversation history"""
         try:
-            messages = self.memory.chat_memory.messages
             history = []
             
-            for msg in messages:
+            for msg in self.chat_history:
                 if isinstance(msg, HumanMessage):
                     history.append({
                         "type": "human",

@@ -14,7 +14,7 @@ from langchain_core.tools import BaseTool, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_core.callbacks.base import BaseCallbackHandler
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
@@ -410,7 +410,7 @@ class DatabaseAgent:
         ])
         
         # Create agent
-        self.agent = create_openai_functions_agent(
+        self.agent = create_tool_calling_agent(
             llm=self.llm,
             tools=self.tools,
             prompt=self.prompt

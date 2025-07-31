@@ -30,16 +30,16 @@ scrape_configs:
   # Gateway service metrics
   - job_name: 'ai-box-gateway'
     static_configs:
-      - targets: ['gateway:5000']
+      - targets: ['host.docker.internal:5000']
     scrape_interval: 15s
-    metrics_path: /metrics
+    metrics_path: /health
     scrape_timeout: 10s
     honor_labels: true
 
   # RAG service metrics
   - job_name: 'ai-box-rag'
     static_configs:
-      - targets: ['rag:8001']
+      - targets: ['host.docker.internal:8001']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
@@ -47,7 +47,7 @@ scrape_configs:
   # Agents service metrics
   - job_name: 'ai-box-agents'
     static_configs:
-      - targets: ['agents:8002']
+      - targets: ['host.docker.internal:8002']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
@@ -55,7 +55,7 @@ scrape_configs:
   # Ollama service metrics
   - job_name: 'ai-box-ollama'
     static_configs:
-      - targets: ['ollama:11434']
+      - targets: ['host.docker.internal:11434']
     scrape_interval: 60s
     metrics_path: /api/tags
     scrape_timeout: 30s
@@ -63,7 +63,7 @@ scrape_configs:
   # PostgreSQL monitoring (using postgres_exporter)
   - job_name: 'ai-box-postgres'
     static_configs:
-      - targets: ['postgres-exporter:9187']
+      - targets: ['host.docker.internal:5432']
     scrape_interval: 30s
     scrape_timeout: 10s
 
@@ -76,51 +76,51 @@ scrape_configs:
     scrape_timeout: 10s
 
   # Node exporter (system metrics)
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
-    scrape_interval: 15s
-    scrape_timeout: 10s
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #   scrape_interval: 15s
+  #   scrape_timeout: 10s
 
   # Docker container metrics (cAdvisor)
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-    scrape_interval: 15s
-    scrape_timeout: 10s
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #   scrape_interval: 15s
+  #   scrape_timeout: 10s
 
   # NGINX metrics (if nginx-prometheus-exporter is used)
-  - job_name: 'ai-box-nginx'
-    static_configs:
-      - targets: ['nginx-exporter:9113']
-    scrape_interval: 15s
-    scrape_timeout: 10s
+  # - job_name: 'ai-box-nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
+  #   scrape_interval: 15s
+  #   scrape_timeout: 10s
 
   # Redis metrics (if Redis is used for caching)
-  - job_name: 'ai-box-redis'
-    static_configs:
-      - targets: ['redis-exporter:9121']
-    scrape_interval: 30s
-    scrape_timeout: 10s
+  # - job_name: 'ai-box-redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #   scrape_interval: 30s
+  #   scrape_timeout: 10s
 
   # Blackbox exporter for endpoint monitoring
-  - job_name: 'blackbox'
-    metrics_path: /probe
-    params:
-      module: [http_2xx]
-    static_configs:
-      - targets:
-        - http://gateway:5000/health
-        - http://rag:8001/health
-        - http://agents:8002/health
-        - http://ollama:11434/api/tags
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
+  # - job_name: 'blackbox'
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #       - http://gateway:5000/health
+  #       - http://rag:8001/health
+  #       - http://agents:8002/health
+  #       - http://ollama:11434/api/tags
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
 
 # Remote write configuration (for external monitoring systems)
 # remote_write:

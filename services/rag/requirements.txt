@@ -42,3 +42,7 @@ requests
 numpy
 pandas
 scikit-learn
+
+# Monitoring and logging
+prometheus-client
+structlog

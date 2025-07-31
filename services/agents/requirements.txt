@@ -37,3 +37,7 @@ passlib[bcrypt]
 # Data processing
 pandas
 numpy
+
+# Monitoring and logging
+prometheus-client
+structlog

@@ -1,6 +1,4 @@
 
-version: '3.8'
-
 # AI Box - Локальное развертывание
 # Использует образы из папки services
 
@@ -12,7 +10,7 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-gateway
     ports:
-      - "5000:5000"
+      - "8000:5000"
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
       - QDRANT_URL=http://qdrant:6333
@@ -150,7 +148,8 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
       QDRANT__SERVICE__ENABLE_CORS: true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: 
+        ["CMD-SHELL", "timeout 5s bash -c '</dev/tcp/localhost/6333' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

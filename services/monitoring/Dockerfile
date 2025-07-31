@@ -4,6 +4,9 @@ FROM prom/prometheus:latest
 # Switch to root for configuration
 USER root
 
+# Create nogroup if it doesn't exist (nobody user already exists in base image)
+RUN addgroup -S nogroup 2>/dev/null || true
+
 # Copy Prometheus configuration
 COPY prometheus.yml /etc/prometheus/prometheus.yml
 
@@ -27,4 +30,6 @@ CMD ["--config.file=/etc/prometheus/prometheus.yml", \
      "--web.console.libraries=/etc/prometheus/console_libraries", \
      "--web.console.templates=/etc/prometheus/consoles", \
      "--web.enable-lifecycle", \
-     "--storage.tsdb.retention.time=30d"]
+     "--storage.tsdb.retention.time=30d", \
+     "--storage.tsdb.retention.size=10GB", \
+     "--storage.tsdb.wal-compression"]

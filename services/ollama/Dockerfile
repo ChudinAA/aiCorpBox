@@ -69,5 +69,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Expose port
 EXPOSE 11434
 
-# Start with model initialization
-CMD ["/usr/local/bin/init-models.sh"]
+# Override the entrypoint and start with model initialization
+ENTRYPOINT []
+CMD ["/bin/bash", "/usr/local/bin/init-models.sh"]

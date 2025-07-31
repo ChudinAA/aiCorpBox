@@ -130,23 +130,4 @@ scrape_configs:
 #       max_shards: 200
 #       capacity: 2500
 
-# Storage configuration
-storage:
-  tsdb:
-    retention.time: 30d
-    retention.size: 10GB
-    wal-compression: true
-
-# Web configuration
-web:
-  console.templates: '/etc/prometheus/consoles'
-  console.libraries: '/etc/prometheus/console_libraries'
-  enable-lifecycle: true
-  enable-admin-api: true
-  max-connections: 512
-  read-timeout: 30s
-
-# Log configuration
-log:
-  level: info
-  format: json
+# Note: Storage, web, and log configurations are now handled via command line flags in Dockerfile

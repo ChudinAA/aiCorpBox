@@ -1,0 +1,148 @@
+# RAG Service Configuration
+service:
+  name: "AI Box RAG Service"
+  version: "1.0.0"
+  port: 8001
+  workers: 4
+
+# LLM Configuration
+llm:
+  model: "llama3.2:3b"
+  temperature: 0.1
+  max_tokens: 2048
+  context_window: 4096
+
+# Embeddings Configuration
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+  batch_size: 32
+  cache_folder: "/app/embeddings_cache"
+
+# Text Processing Configuration
+text_processing:
+  chunk_size: 1000
+  chunk_overlap: 200
+  separator: "\n\n"
+  
+# Document Processing
+document_processing:
+  max_file_size_mb: 50
+  supported_formats:
+    - pdf
+    - docx
+    - txt
+    - html
+    - htm
+  
+  # PDF processing
+  pdf:
+    extract_images: false
+    extract_tables: true
+  
+  # Text cleaning
+  cleaning:
+    remove_extra_whitespace: true
+    remove_special_chars: false
+    min_text_length: 50
+
+# Vector Store Configuration
+vector_store:
+  type: "qdrant"
+  collection_name: "documents"
+  distance_metric: "cosine"
+  
+  # Qdrant specific settings
+  qdrant:
+    host: "qdrant"
+    port: 6333
+    grpc_port: 6334
+    prefer_grpc: false
+    https: false
+    api_key: null
+    timeout: 30
+
+# Retrieval Configuration
+retrieval:
+  top_k: 5
+  similarity_threshold: 0.7
+  rerank: false
+  
+  # Query processing
+  query_processing:
+    expand_query: false
+    use_query_decomposition: false
+    max_query_length: 500
+
+# Response Generation Configuration
+generation:
+  response_mode: "tree_summarize"
+  max_response_length: 1000
+  include_sources: true
+  max_sources: 3
+  
+  # Template for response generation
+  system_prompt: |
+    You are a helpful AI assistant that answers questions based on the provided context.
+    Use only the information from the context to answer questions.
+    If the context doesn't contain enough information, say so explicitly.
+    Be concise but comprehensive in your responses.
+
+# Database Configuration
+database:
+  url: null  # Will be set from environment variables
+  pool_size: 10
+  max_overflow: 20
+  pool_pre_ping: true
+  pool_recycle: 3600
+
+# Caching Configuration
+cache:
+  enabled: true
+  type: "memory"
+  ttl_seconds: 3600
+  max_size: 1000
+
+# Monitoring Configuration
+monitoring:
+  metrics_enabled: true
+  log_level: "INFO"
+  performance_tracking: true
+  
+  # Health check configuration
+  health_check:
+    interval_seconds: 30
+    timeout_seconds: 10
+
+# Security Configuration
+security:
+  api_key_required: false
+  cors_enabled: true
+  max_requests_per_minute: 100
+  
+  # File upload security
+  upload_security:
+    scan_uploads: false
+    max_file_size_mb: 50
+    allowed_extensions:
+      - pdf
+      - docx
+      - txt
+      - html
+      - htm
+
+# Performance Configuration
+performance:
+  async_processing: true
+  batch_processing: true
+  concurrent_requests: 10
+  
+  # Memory management
+  memory:
+    max_memory_usage_mb: 2048
+    cleanup_interval_seconds: 300
+    
+  # CPU optimization
+  cpu:
+    max_cpu_usage_percent: 80
+    thread_pool_size: 4

@@ -1,41 +1,152 @@
+# Prometheus configuration for AI Box monitoring
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: 'ai-box'
+    environment: 'production'
 
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  # - "alerts.yml"
 
+# Scrape configuration
 scrape_configs:
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
 
+  # Gateway service metrics
   - job_name: 'ai-box-gateway'
     static_configs:
       - targets: ['gateway:5000']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
 
+  # RAG service metrics
   - job_name: 'ai-box-rag'
     static_configs:
       - targets: ['rag:8001']
-    metrics_path: '/metrics'
     scrape_interval: 30s
+    metrics_path: /health
+    scrape_timeout: 10s
 
+  # Agents service metrics
   - job_name: 'ai-box-agents'
     static_configs:
       - targets: ['agents:8002']
-    metrics_path: '/metrics'
     scrape_interval: 30s
+    metrics_path: /health
+    scrape_timeout: 10s
 
-  - job_name: 'ollama'
+  # Ollama service metrics
+  - job_name: 'ai-box-ollama'
     static_configs:
       - targets: ['ollama:11434']
-    scrape_interval: 30s
+    scrape_interval: 60s
+    metrics_path: /api/tags
+    scrape_timeout: 30s
 
-  - job_name: 'qdrant'
+  # PostgreSQL monitoring (using postgres_exporter)
+  - job_name: 'ai-box-postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Qdrant metrics
+  - job_name: 'ai-box-qdrant'
     static_configs:
       - targets: ['qdrant:6333']
-    metrics_path: '/metrics'
     scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Node exporter (system metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Docker container metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # NGINX metrics (if nginx-prometheus-exporter is used)
+  - job_name: 'ai-box-nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Redis metrics (if Redis is used for caching)
+  - job_name: 'ai-box-redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Blackbox exporter for endpoint monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - http://gateway:5000/health
+        - http://rag:8001/health
+        - http://agents:8002/health
+        - http://ollama:11434/api/tags
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+# Remote write configuration (for external monitoring systems)
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint"
+#     queue_config:
+#       max_samples_per_send: 1000
+#       max_shards: 200
+#       capacity: 2500
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    wal-compression: true
+
+# Web configuration
+web:
+  console.templates: '/etc/prometheus/consoles'
+  console.libraries: '/etc/prometheus/console_libraries'
+  enable-lifecycle: true
+  enable-admin-api: true
+  max-connections: 512
+  read-timeout: 30s
+
+# Log configuration
+log:
+  level: info
+  format: json

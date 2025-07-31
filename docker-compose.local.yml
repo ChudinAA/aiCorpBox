@@ -1,27 +1,24 @@
+
 version: '3.8'
 
 # AI Box - Локальное развертывание
-# Упрощенная версия для быстрого старта
+# Использует образы из папки services
 
 services:
   # AI Box Gateway - единая точка входа
   gateway:
-    image: python:3.11-slim
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
     container_name: aibox-gateway
     ports:
       - "5000:5000"
-    volumes:
-      - .:/app
-    working_dir: /app
-    command: >
-      bash -c "
-        pip install --no-cache-dir -r requirements.txt &&
-        python demo_gateway.py
-      "
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
       - QDRANT_URL=http://qdrant:6333
       - OLLAMA_URL=http://ollama:11434
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,10 +29,73 @@ services:
     networks:
       - aibox-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RAG Service - документооборот и поиск
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile
+    container_name: aibox-rag
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OLLAMA_API_BASE=http://ollama:11434
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Agents Service - интеллектуальные агенты
+  agents:
+    build:
+      context: ./services/agents
+      dockerfile: Dockerfile
+    container_name: aibox-agents
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
+      - OLLAMA_API_BASE=http://ollama:11434
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Ollama - локальные языковые модели
   ollama:
-    image: ollama/ollama:latest
+    build:
+      context: ./services/ollama
+      dockerfile: Dockerfile
     container_name: aibox-ollama
     ports:
       - "11434:11434"
@@ -43,17 +103,16 @@ services:
       - ollama-data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
     networks:
       - aibox-network
     restart: unless-stopped
-    # Uncomment if you have NVIDIA GPU
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
 
   # PostgreSQL - основная база данных
   postgres:
@@ -67,6 +126,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
@@ -82,8 +142,13 @@ services:
     container_name: aibox-qdrant
     ports:
       - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__ENABLE_CORS: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
       interval: 30s
@@ -95,12 +160,13 @@ services:
 
   # Prometheus - сбор метрик
   prometheus:
-    image: prom/prometheus:latest
+    build:
+      context: ./services/monitoring
+      dockerfile: Dockerfile
     container_name: aibox-prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -111,6 +177,10 @@ services:
     networks:
       - aibox-network
     restart: unless-stopped
+    depends_on:
+      - gateway
+      - rag
+      - agents
 
   # Grafana - дашборды мониторинга
   grafana:
@@ -126,6 +196,8 @@ services:
     networks:
       - aibox-network
     restart: unless-stopped
+    depends_on:
+      - prometheus
 
 volumes:
   postgres-data:

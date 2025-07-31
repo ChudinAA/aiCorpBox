@@ -1,25 +1,21 @@
+
 version: '3.8'
 
 # AI Box - Production развертывание
-# Оптимизированная версия для серверного развертывания
+# Использует образы из папки services с production настройками
 
 services:
   # AI Box Gateway - production ready
   gateway:
-    image: python:3.11-slim
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
     container_name: aibox-gateway
     restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
-      - .:/app
       - gateway-logs:/app/logs
-    working_dir: /app
-    command: >
-      bash -c "
-        pip install --no-cache-dir -r requirements.txt &&
-        python demo_gateway.py
-      "
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@postgres:5432/aibox}
       - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
@@ -50,9 +46,91 @@ services:
           memory: 512M
           cpus: '0.5'
 
+  # RAG Service - production configuration
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile
+    container_name: aibox-rag
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - rag-logs:/app/logs
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@postgres:5432/aibox}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OLLAMA_API_BASE=http://ollama:11434
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # AI Agents Service - production configuration
+  agents:
+    build:
+      context: ./services/agents
+      dockerfile: Dockerfile
+    container_name: aibox-agents
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - agents-logs:/app/logs
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@postgres:5432/aibox}
+      - OLLAMA_API_BASE=http://ollama:11434
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - aibox-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
   # Ollama - production configuration
   ollama:
-    image: ollama/ollama:latest
+    build:
+      context: ./services/ollama
+      dockerfile: Dockerfile
     container_name: aibox-ollama
     restart: unless-stopped
     ports:
@@ -100,6 +178,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - postgres-logs:/var/log/postgresql
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     command: >
       postgres
       -c max_connections=200
@@ -170,15 +249,16 @@ services:
           memory: 1G
           cpus: '0.5'
 
-  # Prometheus - monitoring
+  # Prometheus - monitoring with custom build
   prometheus:
-    image: prom/prometheus:latest
+    build:
+      context: ./services/monitoring
+      dockerfile: Dockerfile
     container_name: aibox-prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -190,6 +270,11 @@ services:
       - '--storage.tsdb.retention.size=10GB'
     networks:
       - aibox-network
+    depends_on:
+      - gateway
+      - rag
+      - agents
+      - ollama
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
@@ -256,8 +341,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./config/ssl:/etc/nginx/ssl:ro
+      - ./services/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx-logs:/var/log/nginx
     networks:
       - aibox-network
@@ -293,6 +377,10 @@ volumes:
   grafana-logs:
     driver: local
   gateway-logs:
+    driver: local
+  rag-logs:
+    driver: local
+  agents-logs:
     driver: local
   nginx-logs:
     driver: local

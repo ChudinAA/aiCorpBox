@@ -7,13 +7,12 @@ import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from langchain.agents import AgentExecutor, create_openai_functions_agent
-from langchain.schema import BaseMessage, HumanMessage, AIMessage
-from langchain.tools import BaseTool, tool
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.tools import BaseTool, tool
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain_community.llms import Ollama
+from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain_community.chat_models import ChatOllama
 from pydantic import BaseModel, Field
 import requests
@@ -207,7 +206,7 @@ class DocumentAgent:
         ])
         
         # Create agent
-        self.agent = create_openai_functions_agent(
+        self.agent = create_tool_calling_agent(
             llm=self.llm,
             tools=self.tools,
             prompt=self.prompt

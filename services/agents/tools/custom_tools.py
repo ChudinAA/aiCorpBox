@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse
 import hashlib
 
-from langchain.tools import BaseTool
-from pydantic import BaseModel, Field
+from langchain_core.tools import BaseTool, StructuredTool
+from langchain_core.pydantic_v1 import BaseModel, Field
 import requests
 import aiohttp
 import subprocess
@@ -63,7 +63,7 @@ class APICallTool(BaseTool):
     name = "api_call"
     description = "Make HTTP API calls to external services"
     args_schema = APICallInput
-    
+
     def _run(self, url: str, method: str = "GET", headers: Dict[str, str] = None, 
             data: Dict[str, Any] = None, timeout: int = 30) -> str:
         """Execute API call"""
@@ -72,16 +72,16 @@ class APICallTool(BaseTool):
             parsed_url = urlparse(url)
             if not parsed_url.scheme or not parsed_url.netloc:
                 return json.dumps({"error": "Invalid URL format"})
-            
+
             # Security check - only allow certain domains
             allowed_domains = os.getenv("ALLOWED_API_DOMAINS", "").split(",")
             if allowed_domains and allowed_domains != [""]:
                 if parsed_url.netloc not in allowed_domains:
                     return json.dumps({"error": f"Domain {parsed_url.netloc} not allowed"})
-            
+
             headers = headers or {}
             headers.setdefault("User-Agent", "AI-Box-Agent/1.0")
-            
+
             response = requests.request(
                 method=method.upper(),
                 url=url,
@@ -89,21 +89,21 @@ class APICallTool(BaseTool):
                 json=data if data else None,
                 timeout=timeout
             )
-            
+
             result = {
                 "status_code": response.status_code,
                 "headers": dict(response.headers),
                 "url": response.url
             }
-            
+
             # Try to parse JSON, fall back to text
             try:
                 result["data"] = response.json()
             except:
                 result["data"] = response.text[:5000]  # Limit response size
-            
+
             return json.dumps(result, indent=2)
-            
+
         except Exception as e:
             logger.error(f"API call error: {e}")
             return json.dumps({"error": str(e)})
@@ -113,19 +113,19 @@ class FileOperationTool(BaseTool):
     name = "file_operation"
     description = "Perform file system operations (read, write, list, delete)"
     args_schema = FileOperationInput
-    
+
     def _run(self, operation: str, path: str, content: str = None, encoding: str = "utf-8") -> str:
         """Execute file operation"""
         try:
             # Security checks
             base_dir = os.getenv("AGENT_WORKSPACE", "/tmp/ai-box-workspace")
             os.makedirs(base_dir, exist_ok=True)
-            
+
             # Ensure path is within allowed directory
             abs_path = os.path.abspath(os.path.join(base_dir, path.lstrip("/")))
             if not abs_path.startswith(os.path.abspath(base_dir)):
                 return json.dumps({"error": "Path outside allowed workspace"})
-            
+
             if operation == "read":
                 if os.path.isfile(abs_path):
                     with open(abs_path, 'r', encoding=encoding) as f:
@@ -138,21 +138,21 @@ class FileOperationTool(BaseTool):
                     })
                 else:
                     return json.dumps({"error": "File not found"})
-            
+
             elif operation == "write":
                 if content is None:
                     return json.dumps({"error": "Content required for write operation"})
-                
+
                 os.makedirs(os.path.dirname(abs_path), exist_ok=True)
                 with open(abs_path, 'w', encoding=encoding) as f:
                     f.write(content)
-                
+
                 return json.dumps({
                     "success": True,
                     "path": abs_path,
                     "size": len(content)
                 })
-            
+
             elif operation == "list":
                 if os.path.isdir(abs_path):
                     items = []
@@ -164,7 +164,7 @@ class FileOperationTool(BaseTool):
                             "size": os.path.getsize(item_path) if os.path.isfile(item_path) else None,
                             "modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat()
                         })
-                    
+
                     return json.dumps({
                         "success": True,
                         "path": abs_path,
@@ -173,14 +173,14 @@ class FileOperationTool(BaseTool):
                     })
                 else:
                     return json.dumps({"error": "Directory not found"})
-            
+
             elif operation == "delete":
                 if os.path.exists(abs_path):
                     if os.path.isfile(abs_path):
                         os.remove(abs_path)
                     else:
                         os.rmdir(abs_path)
-                    
+
                     return json.dumps({
                         "success": True,
                         "path": abs_path,
@@ -188,10 +188,10 @@ class FileOperationTool(BaseTool):
                     })
                 else:
                     return json.dumps({"error": "File/directory not found"})
-            
+
             else:
                 return json.dumps({"error": f"Unknown operation: {operation}"})
-                
+
         except Exception as e:
             logger.error(f"File operation error: {e}")
             return json.dumps({"error": str(e)})
@@ -201,21 +201,21 @@ class TextProcessingTool(BaseTool):
     name = "text_processing"
     description = "Process text for summarization, entity extraction, sentiment analysis"
     args_schema = TextProcessingInput
-    
+
     def _run(self, text: str, operation: str, options: Dict[str, Any] = None) -> str:
         """Execute text processing"""
         try:
             options = options or {}
-            
+
             if operation == "summarize":
                 # Simple extractive summarization
                 sentences = text.split('. ')
                 max_sentences = options.get("max_sentences", 3)
-                
+
                 # Simple ranking by sentence length (could be improved)
                 ranked_sentences = sorted(sentences, key=len, reverse=True)
                 summary = '. '.join(ranked_sentences[:max_sentences])
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "summarize",
@@ -223,23 +223,23 @@ class TextProcessingTool(BaseTool):
                     "summary_length": len(summary),
                     "summary": summary
                 })
-            
+
             elif operation == "extract_entities":
                 # Simple entity extraction (could be enhanced with NLP libraries)
                 import re
-                
+
                 # Extract emails
                 emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
-                
+
                 # Extract URLs
                 urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', text)
-                
+
                 # Extract phone numbers (basic pattern)
                 phones = re.findall(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', text)
-                
+
                 # Extract potential names (capitalized words)
                 names = re.findall(r'\b[A-Z][a-z]+\s+[A-Z][a-z]+\b', text)
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "extract_entities",
@@ -250,16 +250,16 @@ class TextProcessingTool(BaseTool):
                         "potential_names": names
                     }
                 })
-            
+
             elif operation == "sentiment":
                 # Simple sentiment analysis based on word counting
                 positive_words = ["good", "great", "excellent", "amazing", "wonderful", "fantastic", "awesome", "love", "like", "happy", "pleased"]
                 negative_words = ["bad", "terrible", "awful", "horrible", "hate", "dislike", "sad", "angry", "disappointed", "frustrated"]
-                
+
                 text_lower = text.lower()
-                positive_score = sum(1 for word in positive_words if word in text_lower)
+                positive_score = sum(1 for word inpositive_words if word in text_lower)
                 negative_score = sum(1 for word in negative_words if word in text_lower)
-                
+
                 if positive_score > negative_score:
                     sentiment = "positive"
                     confidence = positive_score / (positive_score + negative_score + 1)
@@ -269,7 +269,7 @@ class TextProcessingTool(BaseTool):
                 else:
                     sentiment = "neutral"
                     confidence = 0.5
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "sentiment",
@@ -278,23 +278,23 @@ class TextProcessingTool(BaseTool):
                     "positive_signals": positive_score,
                     "negative_signals": negative_score
                 })
-            
+
             elif operation == "keywords":
                 # Simple keyword extraction
                 import re
                 from collections import Counter
-                
+
                 # Clean and tokenize
                 words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
-                
+
                 # Remove common stop words
                 stop_words = {"the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "is", "are", "was", "were", "been", "have", "has", "had", "will", "would", "could", "should", "this", "that", "these", "those"}
                 words = [word for word in words if word not in stop_words]
-                
+
                 # Count and get top keywords
                 word_counts = Counter(words)
                 top_keywords = word_counts.most_common(options.get("max_keywords", 10))
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "keywords",
@@ -302,10 +302,10 @@ class TextProcessingTool(BaseTool):
                     "total_words": len(words),
                     "unique_words": len(word_counts)
                 })
-            
+
             else:
                 return json.dumps({"error": f"Unknown text processing operation: {operation}"})
-                
+
         except Exception as e:
             logger.error(f"Text processing error: {e}")
             return json.dumps({"error": str(e)})
@@ -315,16 +315,16 @@ class CalculationTool(BaseTool):
     name = "calculation"
     description = "Perform mathematical calculations and evaluations"
     args_schema = CalculationInput
-    
+
     def _run(self, expression: str, variables: Dict[str, float] = None) -> str:
         """Execute calculation"""
         try:
             variables = variables or {}
-            
+
             # Security: only allow safe mathematical operations
             import ast
             import operator
-            
+
             # Allowed operations
             ops = {
                 ast.Add: operator.add,
@@ -336,7 +336,7 @@ class CalculationTool(BaseTool):
                 ast.USub: operator.neg,
                 ast.UAdd: operator.pos,
             }
-            
+
             def eval_expr(node):
                 if isinstance(node, ast.Num):  # number
                     return node.n
@@ -351,11 +351,11 @@ class CalculationTool(BaseTool):
                     return ops[type(node.op)](eval_expr(node.operand))
                 else:
                     raise TypeError(f"Unsupported operation: {type(node)}")
-            
+
             # Parse and evaluate
             node = ast.parse(expression, mode='eval')
             result = eval_expr(node.body)
-            
+
             return json.dumps({
                 "success": True,
                 "expression": expression,
@@ -363,7 +363,7 @@ class CalculationTool(BaseTool):
                 "result": result,
                 "result_type": type(result).__name__
             })
-            
+
         except Exception as e:
             logger.error(f"Calculation error: {e}")
             return json.dumps({
@@ -377,33 +377,33 @@ class WebScrapingTool(BaseTool):
     name = "web_scraping"
     description = "Scrape content from web pages"
     args_schema = WebScrapingInput
-    
+
     def _run(self, url: str, selector: str = None, max_content_length: int = 10000) -> str:
         """Execute web scraping"""
         try:
             from bs4 import BeautifulSoup
-            
+
             # Validate URL
             parsed_url = urlparse(url)
             if not parsed_url.scheme or not parsed_url.netloc:
                 return json.dumps({"error": "Invalid URL format"})
-            
+
             # Make request
             headers = {
                 "User-Agent": "AI-Box-Agent/1.0",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
             }
-            
+
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
-            
+
             # Parse HTML
             soup = BeautifulSoup(response.content, 'html.parser')
-            
+
             # Remove script and style elements
             for script in soup(["script", "style"]):
                 script.decompose()
-            
+
             if selector:
                 # Extract specific elements
                 elements = soup.select(selector)
@@ -411,14 +411,14 @@ class WebScrapingTool(BaseTool):
             else:
                 # Extract all text
                 content = soup.get_text()
-            
+
             # Clean up whitespace
             content = ' '.join(content.split())
-            
+
             # Limit content length
             if len(content) > max_content_length:
                 content = content[:max_content_length] + "..."
-            
+
             return json.dumps({
                 "success": True,
                 "url": url,
@@ -427,7 +427,7 @@ class WebScrapingTool(BaseTool):
                 "content": content,
                 "title": soup.title.string if soup.title else None
             })
-            
+
         except Exception as e:
             logger.error(f"Web scraping error: {e}")
             return json.dumps({
@@ -441,28 +441,28 @@ class DataTransformTool(BaseTool):
     name = "data_transform"
     description = "Transform and manipulate data structures"
     args_schema = DataTransformInput
-    
+
     def _run(self, data: Union[List[Dict], Dict], operation: str, parameters: Dict[str, Any] = None) -> str:
         """Execute data transformation"""
         try:
             parameters = parameters or {}
-            
+
             if operation == "filter":
                 if not isinstance(data, list):
                     return json.dumps({"error": "Filter operation requires list of dictionaries"})
-                
+
                 field = parameters.get("field")
                 value = parameters.get("value")
                 operator_type = parameters.get("operator", "equals")
-                
+
                 if not field:
                     return json.dumps({"error": "Field parameter required for filter"})
-                
+
                 filtered_data = []
                 for item in data:
                     if field in item:
                         item_value = item[field]
-                        
+
                         if operator_type == "equals" and item_value == value:
                             filtered_data.append(item)
                         elif operator_type == "greater_than" and item_value > value:
@@ -471,7 +471,7 @@ class DataTransformTool(BaseTool):
                             filtered_data.append(item)
                         elif operator_type == "contains" and value in str(item_value):
                             filtered_data.append(item)
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "filter",
@@ -479,19 +479,19 @@ class DataTransformTool(BaseTool):
                     "filtered_count": len(filtered_data),
                     "data": filtered_data
                 })
-            
+
             elif operation == "sort":
                 if not isinstance(data, list):
                     return json.dumps({"error": "Sort operation requires list of dictionaries"})
-                
+
                 field = parameters.get("field")
                 reverse = parameters.get("reverse", False)
-                
+
                 if not field:
                     return json.dumps({"error": "Field parameter required for sort"})
-                
+
                 sorted_data = sorted(data, key=lambda x: x.get(field, ""), reverse=reverse)
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "sort",
@@ -500,23 +500,23 @@ class DataTransformTool(BaseTool):
                     "count": len(sorted_data),
                     "data": sorted_data
                 })
-            
+
             elif operation == "group":
                 if not isinstance(data, list):
                     return json.dumps({"error": "Group operation requires list of dictionaries"})
-                
+
                 field = parameters.get("field")
-                
+
                 if not field:
                     return json.dumps({"error": "Field parameter required for group"})
-                
+
                 grouped_data = {}
                 for item in data:
                     key = item.get(field, "unknown")
                     if key not in grouped_data:
                         grouped_data[key] = []
                     grouped_data[key].append(item)
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "group",
@@ -524,14 +524,14 @@ class DataTransformTool(BaseTool):
                     "groups": len(grouped_data),
                     "data": grouped_data
                 })
-            
+
             elif operation == "aggregate":
                 if not isinstance(data, list):
                     return json.dumps({"error": "Aggregate operation requires list of dictionaries"})
-                
+
                 field = parameters.get("field")
                 agg_type = parameters.get("type", "count")
-                
+
                 if agg_type == "count":
                     result = len(data)
                 elif agg_type == "sum" and field:
@@ -547,7 +547,7 @@ class DataTransformTool(BaseTool):
                     result = max(values) if values else None
                 else:
                     return json.dumps({"error": f"Unknown aggregation type: {agg_type}"})
-                
+
                 return json.dumps({
                     "success": True,
                     "operation": "aggregate",
@@ -556,10 +556,10 @@ class DataTransformTool(BaseTool):
                     "result": result,
                     "input_count": len(data)
                 })
-            
+
             else:
                 return json.dumps({"error": f"Unknown data transformation operation: {operation}"})
-                
+
         except Exception as e:
             logger.error(f"Data transformation error: {e}")
             return json.dumps({

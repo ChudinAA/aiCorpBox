@@ -1,12 +1,11 @@
-
 # Core FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # LangChain ecosystem - Using compatible versions
-langchain==0.1.5
-langchain-community==0.0.17
-langchain-core==0.1.16
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.32
 langchain-experimental==0.0.50
 langgraph==0.0.20
 langsmith==0.0.83

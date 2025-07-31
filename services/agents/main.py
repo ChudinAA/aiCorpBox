@@ -45,7 +45,7 @@ class ConversationModel(Base):
     agent_type = sa.Column(sa.String, index=True)
     user_message = sa.Column(sa.Text)
     agent_response = sa.Column(sa.Text)
-    metadata = sa.Column(sa.JSON)
+    conversation_metadata = sa.Column(sa.JSON)
     created_at = sa.Column(sa.DateTime, default=sa.func.now())
 
 class AgentSessionModel(Base):
@@ -56,7 +56,7 @@ class AgentSessionModel(Base):
     user_id = sa.Column(sa.String, index=True)
     agent_type = sa.Column(sa.String)
     status = sa.Column(sa.String, default="active")
-    metadata = sa.Column(sa.JSON)
+    session_metadata = sa.Column(sa.JSON)
     created_at = sa.Column(sa.DateTime, default=sa.func.now())
     updated_at = sa.Column(sa.DateTime, default=sa.func.now(), onupdate=sa.func.now())
 
@@ -190,7 +190,7 @@ async def save_conversation(
             agent_type=agent_type,
             user_message=user_message,
             agent_response=agent_response,
-            metadata=metadata
+            conversation_metadata=metadata
         )
         db.add(conversation)
         db.commit()
@@ -305,7 +305,7 @@ async def create_session(request: SessionRequest, db: Session = Depends(get_db))
             session_id=session_id,
             user_id=request.user_id,
             agent_type=request.agent_type,
-            metadata=request.metadata
+            session_metadata=request.metadata
         )
         
         db.add(session)
@@ -371,7 +371,7 @@ async def get_conversation_history(session_id: str, db: Session = Depends(get_db
                 "user_message": conv.user_message,
                 "agent_response": conv.agent_response,
                 "agent_type": conv.agent_type,
-                "metadata": conv.metadata,
+                "metadata": conv.conversation_metadata,
                 "created_at": conv.created_at.isoformat()
             })
         

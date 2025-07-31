@@ -1,4 +1,3 @@
-
 # AI Box - Локальное развертывание
 # Использует образы из папки services
 
@@ -148,7 +147,7 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
       QDRANT__SERVICE__ENABLE_CORS: true
     healthcheck:
-      test: 
+      test:
         ["CMD-SHELL", "timeout 5s bash -c '</dev/tcp/localhost/6333' || exit 1"]
       interval: 30s
       timeout: 10s

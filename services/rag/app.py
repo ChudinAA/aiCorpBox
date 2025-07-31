@@ -56,7 +56,7 @@ class DocumentModel(Base):
     id = sa.Column(sa.Integer, primary_key=True, index=True)
     filename = sa.Column(sa.String, index=True)
     content_hash = sa.Column(sa.String, unique=True, index=True)
-    metadata = sa.Column(sa.JSON)
+    document_metadata = sa.Column(sa.JSON)
     created_at = sa.Column(sa.DateTime, default=sa.func.now())
     updated_at = sa.Column(sa.DateTime, default=sa.func.now(), onupdate=sa.func.now())
 
@@ -310,7 +310,7 @@ async def upload_document(
         doc_record = DocumentModel(
             filename=file.filename,
             content_hash=content_hash,
-            metadata={
+            document_metadata={
                 "file_type": file_extension,
                 "file_size": len(content),
                 "content_length": len(text)
@@ -394,7 +394,7 @@ async def list_documents(db: Session = Depends(get_db)):
         {
             "id": doc.id,
             "filename": doc.filename,
-            "metadata": doc.metadata,
+            "metadata": doc.document_metadata,
             "created_at": doc.created_at,
             "updated_at": doc.updated_at
         }

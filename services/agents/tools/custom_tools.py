@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 import hashlib
 
 from langchain_core.tools import BaseTool, StructuredTool
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 import requests
 import aiohttp
 import subprocess
@@ -60,9 +60,9 @@ class DataTransformInput(BaseModel):
 
 class APICallTool(BaseTool):
     """Tool for making HTTP API calls"""
-    name = "api_call"
-    description = "Make HTTP API calls to external services"
-    args_schema = APICallInput
+    name: str = "api_call"
+    description: str = "Make HTTP API calls to external services"
+    args_schema: type = APICallInput
 
     def _run(self, url: str, method: str = "GET", headers: Dict[str, str] = None, 
             data: Dict[str, Any] = None, timeout: int = 30) -> str:
@@ -110,9 +110,9 @@ class APICallTool(BaseTool):
 
 class FileOperationTool(BaseTool):
     """Tool for file system operations"""
-    name = "file_operation"
-    description = "Perform file system operations (read, write, list, delete)"
-    args_schema = FileOperationInput
+    name: str = "file_operation"
+    description: str = "Perform file system operations (read, write, list, delete)"
+    args_schema: type = FileOperationInput
 
     def _run(self, operation: str, path: str, content: str = None, encoding: str = "utf-8") -> str:
         """Execute file operation"""
@@ -198,9 +198,9 @@ class FileOperationTool(BaseTool):
 
 class TextProcessingTool(BaseTool):
     """Tool for text processing operations"""
-    name = "text_processing"
-    description = "Process text for summarization, entity extraction, sentiment analysis"
-    args_schema = TextProcessingInput
+    name: str = "text_processing"
+    description: str = "Process text for summarization, entity extraction, sentiment analysis"
+    args_schema: type = TextProcessingInput
 
     def _run(self, text: str, operation: str, options: Dict[str, Any] = None) -> str:
         """Execute text processing"""
@@ -257,7 +257,7 @@ class TextProcessingTool(BaseTool):
                 negative_words = ["bad", "terrible", "awful", "horrible", "hate", "dislike", "sad", "angry", "disappointed", "frustrated"]
 
                 text_lower = text.lower()
-                positive_score = sum(1 for word inpositive_words if word in text_lower)
+                positive_score = sum(1 for word in positive_words if word in text_lower)
                 negative_score = sum(1 for word in negative_words if word in text_lower)
 
                 if positive_score > negative_score:
@@ -312,9 +312,9 @@ class TextProcessingTool(BaseTool):
 
 class CalculationTool(BaseTool):
     """Tool for mathematical calculations"""
-    name = "calculation"
-    description = "Perform mathematical calculations and evaluations"
-    args_schema = CalculationInput
+    name: str = "calculation"
+    description: str = "Perform mathematical calculations and evaluations"
+    args_schema: type = CalculationInput
 
     def _run(self, expression: str, variables: Dict[str, float] = None) -> str:
         """Execute calculation"""
@@ -374,9 +374,9 @@ class CalculationTool(BaseTool):
 
 class WebScrapingTool(BaseTool):
     """Tool for web scraping"""
-    name = "web_scraping"
-    description = "Scrape content from web pages"
-    args_schema = WebScrapingInput
+    name: str = "web_scraping"
+    description: str = "Scrape content from web pages"
+    args_schema: type = WebScrapingInput
 
     def _run(self, url: str, selector: str = None, max_content_length: int = 10000) -> str:
         """Execute web scraping"""
@@ -438,9 +438,9 @@ class WebScrapingTool(BaseTool):
 
 class DataTransformTool(BaseTool):
     """Tool for data transformation operations"""
-    name = "data_transform"
-    description = "Transform and manipulate data structures"
-    args_schema = DataTransformInput
+    name: str = "data_transform"
+    description: str = "Transform and manipulate data structures"
+    args_schema: type = DataTransformInput
 
     def _run(self, data: Union[List[Dict], Dict], operation: str, parameters: Dict[str, Any] = None) -> str:
         """Execute data transformation"""

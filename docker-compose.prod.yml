@@ -303,7 +303,7 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_INSTALL_PLUGINS=grafana-worldmap-panel
       - GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION=false
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false

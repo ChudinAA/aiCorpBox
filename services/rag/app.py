@@ -7,7 +7,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import yaml
 
 # LlamaIndex imports
@@ -427,6 +429,11 @@ async def delete_document(document_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error deleting document: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting document: {e}")
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type="text/plain")
 
 if __name__ == "__main__":
     uvicorn.run(

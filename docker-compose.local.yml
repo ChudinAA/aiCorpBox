@@ -16,6 +16,8 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
+      - API_TOKEN=your-api-token-here
+      - SECRET_KEY=your-secret-key-here
     depends_on:
       postgres:
         condition: service_healthy

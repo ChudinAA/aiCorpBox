@@ -623,6 +623,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, user_id: str 
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint"""
+    from fastapi.responses import Response
     return Response(generate_latest(), media_type="text/plain")
 
 if __name__ == "__main__":

@@ -27,45 +27,67 @@ scrape_configs:
     scrape_interval: 5s
     metrics_path: /metrics
 
-  # Gateway service metrics
+  # Gateway service metrics (with authentication)
   - job_name: 'ai-box-gateway'
     static_configs:
       - targets: ['gateway:5000']
     scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    headers:
+      Authorization: 'Bearer your-api-token-here'
+
+  # Gateway health check (separate job without auth requirement)
+  - job_name: 'ai-box-gateway-health'
+    static_configs:
+      - targets: ['gateway:5000']
+    scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
-    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'up'
+        target_label: service
+        replacement: 'gateway'
 
-  # RAG service metrics
-  - job_name: 'ai-box-rag'
+  # RAG service health check
+  - job_name: 'ai-box-rag-health'
     static_configs:
       - targets: ['rag:8001']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'up'
+        target_label: service
+        replacement: 'rag'
 
-  # Agents service metrics
-  - job_name: 'ai-box-agents'
+  # Agents service health check
+  - job_name: 'ai-box-agents-health'
     static_configs:
       - targets: ['agents:8002']
     scrape_interval: 30s
     metrics_path: /health
     scrape_timeout: 10s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'up'
+        target_label: service
+        replacement: 'agents'
 
-  # Ollama service metrics
-  - job_name: 'ai-box-ollama'
+  # Ollama health check (using correct endpoint)
+  - job_name: 'ai-box-ollama-health'
     static_configs:
       - targets: ['ollama:11434']
     scrape_interval: 60s
     metrics_path: /api/tags
     scrape_timeout: 30s
-
-  # PostgreSQL monitoring (using postgres_exporter)
-  - job_name: 'ai-box-postgres'
-    static_configs:
-      - targets: ['postgres:5432']
-    scrape_interval: 30s
-    scrape_timeout: 10s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'up'
+        target_label: service
+        replacement: 'ollama'
 
   # Qdrant metrics
   - job_name: 'ai-box-qdrant'

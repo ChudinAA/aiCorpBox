@@ -57,8 +57,11 @@ GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))
 
 # Service URLs
 OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://ollama:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
 RAG_API_BASE = os.getenv("RAG_API_BASE", "http://rag:8001")
+RAG_HOST = os.getenv("RAG_HOST", "rag")
 AGENTS_API_BASE = os.getenv("AGENTS_API_BASE", "http://agents:8002")
+AGENTS_HOST = os.getenv("AGENTS_HOST", "agents")
 
 # Pydantic models
 class GatewayRequest(BaseModel):
@@ -331,7 +334,7 @@ async def health_check():
     services = {}
     
     # Check backend services
-    for service, url, health_check_path in [("ollama", OLLAMA_API_BASE, "api/tags"), ("rag", RAG_API_BASE, "health"), ("agents", AGENTS_API_BASE, "health")]:
+    for service, url, health_check_path in [(OLLAMA_HOST, OLLAMA_API_BASE, "api/tags"), (RAG_HOST, RAG_API_BASE, "health"), (AGENTS_HOST, AGENTS_API_BASE, "health")]:
         try:
             response = requests.get(f"{url}/{health_check_path}", timeout=5)
             services[service] = "healthy" if response.status_code == 200 else "unhealthy"

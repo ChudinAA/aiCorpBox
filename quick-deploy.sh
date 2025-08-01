@@ -41,17 +41,11 @@ if [ "$DEPLOYMENT_TYPE" = "local" ]; then
         sudo usermod -aG docker $USER
     fi
 
-    # Создание .env если нет
+    # Проверка .env файла
     if [ ! -f .env ]; then
-        log_info "⚙️ Создаю конфигурацию..."
-        cat > .env << 'EOF'
-DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
-POSTGRES_DB=aibox
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-QDRANT_URL=http://qdrant:6333
-OLLAMA_URL=http://ollama:11434
-EOF
+        log_info "⚙️ Копирую .env.example в .env..."
+        cp .env.example .env
+        log_warning "Отредактируйте .env файл при необходимости"
     fi
 
     # Остановка и запуск

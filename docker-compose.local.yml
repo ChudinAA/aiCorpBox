@@ -1,3 +1,4 @@
+
 # AI Box - Локальное развертывание
 # Использует образы из папки services
 
@@ -9,15 +10,17 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-gateway
     ports:
-      - "8000:5000"
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
-      - QDRANT_URL=http://qdrant:6333
-      - OLLAMA_URL=http://ollama:11434
-      - ENVIRONMENT=development
+      - DATABASE_URL=${DATABASE_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - OLLAMA_URL=${OLLAMA_API_BASE}
+      - ENVIRONMENT=${ENVIRONMENT}
       - LOG_LEVEL=INFO
-      - API_TOKEN=your-api-token-here
-      - SECRET_KEY=your-secret-key-here
+      - API_TOKEN=${API_TOKEN}
+      - SECRET_KEY=${GATEWAY_SECRET_KEY}
+      - GATEWAY_HOST=${GATEWAY_HOST}
+      - GATEWAY_PORT=${GATEWAY_PORT}
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,7 +32,7 @@ services:
       - aibox-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,18 +44,19 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-rag
     ports:
-      - "8001:8001"
+      - "${RAG_PORT}:${RAG_PORT}"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=aibox
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - OLLAMA_API_BASE=http://ollama:11434
-      - ENVIRONMENT=development
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - QDRANT_HOST=${VECTOR_DB_HOST}
+      - QDRANT_PORT=${VECTOR_DB_PORT}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - RAG_PORT=${RAG_PORT}
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +68,7 @@ services:
       - aibox-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${RAG_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -76,16 +80,17 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-agents
     ports:
-      - "8002:8002"
+      - "${AGENTS_PORT}:${AGENTS_PORT}"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/aibox
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=aibox
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - OLLAMA_API_BASE=http://ollama:11434
-      - ENVIRONMENT=development
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - AGENTS_PORT=${AGENTS_PORT}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +100,7 @@ services:
       - aibox-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${AGENTS_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -107,17 +112,18 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-ollama
     ports:
-      - "11434:11434"
+      - "${OLLAMA_PORT}:${OLLAMA_PORT}"
     volumes:
       - ollama-data:/root/.ollama
     environment:
-      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_HOST=${OLLAMA_HOST}
       - OLLAMA_ORIGINS=*
+      - OLLAMA_PORT=${OLLAMA_PORT}
     networks:
       - aibox-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "curl", "-f", "http://localhost:${OLLAMA_PORT}/api/tags"]
       interval: 60s
       timeout: 30s
       retries: 5
@@ -128,16 +134,16 @@ services:
     image: postgres:15
     container_name: aibox-postgres
     environment:
-      POSTGRES_DB: aibox
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -150,17 +156,17 @@ services:
     image: qdrant/qdrant:latest
     container_name: aibox-qdrant
     ports:
-      - "6333:6333"
+      - "${VECTOR_DB_PORT}:${VECTOR_DB_PORT}"
       - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
     environment:
-      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__HTTP_PORT: ${VECTOR_DB_PORT}
       QDRANT__SERVICE__GRPC_PORT: 6334
       QDRANT__SERVICE__ENABLE_CORS: true
     healthcheck:
       test:
-        ["CMD-SHELL", "timeout 5s bash -c '</dev/tcp/localhost/6333' || exit 1"]
+        ["CMD-SHELL", "timeout 5s bash -c '</dev/tcp/localhost/${VECTOR_DB_PORT}' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -175,9 +181,11 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-prometheus
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
     volumes:
       - prometheus-data:/prometheus
+    environment:
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT}
     networks:
       - aibox-network
     restart: unless-stopped
@@ -191,9 +199,10 @@ services:
     image: grafana/grafana:latest
     container_name: aibox-grafana
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_HTTP_PORT=${GRAFANA_PORT}
     volumes:
       - grafana-data:/var/lib/grafana
     networks:

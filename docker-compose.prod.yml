@@ -14,11 +14,15 @@ services:
     volumes:
       - gateway-logs:/app/logs
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@postgres:5432/aibox}
-      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
-      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - OLLAMA_URL=${OLLAMA_API_BASE}
+      - ENVIRONMENT=${ENVIRONMENT}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_TOKEN=${API_TOKEN}
+      - SECRET_KEY=${GATEWAY_SECRET_KEY}
+      - GATEWAY_HOST=${GATEWAY_HOST}
+      - GATEWAY_PORT=${GATEWAY_PORT}
     depends_on:
       postgres:
         condition: service_healthy

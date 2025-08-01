@@ -41,23 +41,23 @@ Base = declarative_base()
 # Prometheus metrics (with registry check to avoid conflicts)
 try:
     from prometheus_client import REGISTRY, CollectorRegistry
-    
+
     # Check if metrics already exist
     existing_metrics = {}
     for collector in list(REGISTRY._collector_to_names.keys()):
         if hasattr(collector, '_name'):
             existing_metrics[collector._name] = collector
-    
+
     if 'aibox_requests_total' in existing_metrics:
         requests_total = existing_metrics['aibox_requests_total']
     else:
         requests_total = Counter('aibox_requests_total', 'Total requests', ['method', 'endpoint'])
-    
+
     if 'aibox_request_duration_seconds' in existing_metrics:
         request_duration = existing_metrics['aibox_request_duration_seconds']
     else:
         request_duration = Histogram('aibox_request_duration_seconds', 'Request duration')
-    
+
     if 'aibox_active_websocket_connections' in existing_metrics:
         active_connections = existing_metrics['aibox_active_websocket_connections']
     else:
@@ -73,7 +73,7 @@ except Exception as e:
 # Database Models
 class Conversation(Base):
     __tablename__ = "conversations"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String, index=True)
     user_message = Column(Text)
@@ -84,7 +84,7 @@ class Conversation(Base):
 
 class Document(Base):
     __tablename__ = "documents"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
     content = Column(Text)
@@ -109,6 +109,8 @@ class QueryRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 # Create FastAPI app
+import os
+
 app = FastAPI(
     title="AI Box Demo Gateway",
     description="A demonstration of the AI Box Enterprise AI Platform",
@@ -152,7 +154,7 @@ async def health_check():
         db = SessionLocal()
         db.execute(text("SELECT 1"))
         db.close()
-        
+
         return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
@@ -348,35 +350,35 @@ async def main_page():
                 <p>Unified entry point for all AI services with WebSocket support, authentication, and monitoring.</p>
                 <p><strong>Features:</strong> Rate limiting, Request routing, Metrics collection</p>
             </div>
-            
+
             <div class="service-card">
                 <h3>🤖 LLM Service (Ollama)</h3>
                 <p><span class="status-badge status-demo">DEMO MODE</span></p>
                 <p>Local language models for privacy-focused AI inference without external dependencies.</p>
                 <p><strong>Models:</strong> Llama, CodeLlama, Mistral, Phi-3</p>
             </div>
-            
+
             <div class="service-card">
                 <h3>📚 RAG Service</h3>
                 <p><span class="status-badge status-demo">DEMO MODE</span></p>
                 <p>Document processing and retrieval using LlamaIndex with vector search capabilities.</p>
                 <p><strong>Features:</strong> PDF/DOCX parsing, Semantic search, Context-aware responses</p>
             </div>
-            
+
             <div class="service-card">
                 <h3>🔧 AI Agents</h3>
                 <p><span class="status-badge status-demo">DEMO MODE</span></p>
                 <p>Intelligent agents using LangChain with custom tools for complex task automation.</p>
                 <p><strong>Agents:</strong> Document Agent, Database Agent, Custom Tools</p>
             </div>
-            
+
             <div class="service-card">
                 <h3>💾 PostgreSQL Database</h3>
                 <p><span class="status-badge status-available">CONNECTED</span></p>
                 <p>Primary application database for conversations, metadata, and structured data storage.</p>
                 <p><strong>Features:</strong> ACID compliance, Full-text search, JSON support</p>
             </div>
-            
+
             <div class="service-card">
                 <h3>📊 Monitoring Stack</h3>
                 <p><span class="status-badge status-available">METRICS ENABLED</span></p>
@@ -456,14 +458,14 @@ async def main_page():
             const serviceType = document.getElementById('service-select').value;
             const message = document.getElementById('demo-input').value;
             const responseArea = document.getElementById('demo-response');
-            
+
             if (!message.trim()) {
                 responseArea.textContent = 'Please enter a message';
                 return;
             }
-            
+
             responseArea.textContent = 'Processing request...';
-            
+
             try {
                 const response = await fetch('/api/demo/chat', {
                     method: 'POST',
@@ -476,14 +478,14 @@ async def main_page():
                         session_id: 'demo-session'
                     })
                 });
-                
+
                 const result = await response.json();
                 responseArea.textContent = JSON.stringify(result, null, 2);
             } catch (error) {
                 responseArea.textContent = 'Error: ' + error.message;
             }
         }
-        
+
         // Auto-refresh status every 30 seconds
         setInterval(async () => {
             try {
@@ -507,24 +509,24 @@ async def demo_chat(message: ChatMessage):
     start_time = datetime.utcnow()
     if requests_total:
         requests_total.labels(method='POST', endpoint='/api/demo/chat').inc()
-    
+
     try:
         # Simulate different service responses
         response_text = ""
         service_used = message.service_type
-        
+
         if message.service_type == "general":
             response_text = f"🤖 AI Box General Service Demo\n\nReceived your message: '{message.message}'\n\nIn a full deployment, this would be processed by:\n- Ollama LLM service for language understanding\n- Context management for conversation history\n- Real-time response generation\n\nDemo Response: This is a simulated response showing how the AI Box platform would handle general chat requests with local language models."
-        
+
         elif message.service_type == "rag":
             response_text = f"📚 AI Box RAG Service Demo\n\nQuery: '{message.message}'\n\nIn a full deployment, this would:\n1. Process your query through semantic search\n2. Retrieve relevant documents from Qdrant vector database\n3. Generate context-aware responses using LlamaIndex\n4. Combine retrieved information with LLM generation\n\nDemo Response: This simulates document-based Q&A where your question would be answered using uploaded documents and knowledge base."
-        
+
         elif message.service_type == "agents":
             response_text = f"🔧 AI Box Agents Service Demo\n\nTask: '{message.message}'\n\nIn a full deployment, AI agents would:\n1. Analyze the task and select appropriate tools\n2. Execute multi-step workflows using LangChain\n3. Access external APIs and databases\n4. Provide structured, actionable responses\n\nDemo Response: This simulates intelligent agents that can perform complex tasks like document analysis, database queries, API integrations, and workflow automation."
-        
+
         elif message.service_type == "database":
             response_text = f"💾 AI Box Database Service Demo\n\nQuery: '{message.message}'\n\nIn a full deployment, this would:\n1. Parse natural language database queries\n2. Generate safe SQL from your request\n3. Execute queries against PostgreSQL\n4. Return structured results with explanations\n\nDemo Response: This simulates natural language to SQL conversion, allowing non-technical users to query databases using plain English."
-        
+
         # Store conversation in database
         db = SessionLocal()
         try:
@@ -542,11 +544,11 @@ async def demo_chat(message: ChatMessage):
             db.rollback()
         finally:
             db.close()
-        
+
         duration = (datetime.utcnow() - start_time).total_seconds()
         if request_duration:
             request_duration.observe(duration)
-        
+
         return {
             "response": response_text,
             "service_used": service_used,
@@ -555,7 +557,7 @@ async def demo_chat(message: ChatMessage):
             "demo_mode": True,
             "processing_time": f"{duration:.2f}s"
         }
-        
+
     except Exception as e:
         logger.error(f"Demo chat error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -601,18 +603,18 @@ async def websocket_endpoint(websocket: WebSocket):
     websocket_connections.append(websocket)
     if active_connections:
         active_connections.set(len(websocket_connections))
-    
+
     try:
         await websocket.send_text(json.dumps({
             "type": "welcome",
             "message": "Connected to AI Box WebSocket",
             "demo_mode": True
         }))
-        
+
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
-            
+
             # Echo back the message with AI Box processing simulation
             response = {
                 "type": "response",
@@ -621,15 +623,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 "timestamp": datetime.utcnow().isoformat(),
                 "demo_mode": True
             }
-            
+
             await websocket.send_text(json.dumps(response))
-            
+
     except WebSocketDisconnect:
         websocket_connections.remove(websocket)
         if active_connections:
             active_connections.set(len(websocket_connections))
 
-# Run the application
+# Configuration from environment variables
+GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
+GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/aibox")
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+
 if __name__ == "__main__":
     print("🚀 Starting AI Box Demo Gateway...")
     print("📊 Features: Gateway, Database, WebSocket, Monitoring")
@@ -637,11 +645,11 @@ if __name__ == "__main__":
     print("📖 Docs: http://localhost:5000/docs")
     print("❤️  Health: http://localhost:5000/health")
     print("📈 Metrics: http://localhost:5000/metrics")
-    
+
     uvicorn.run(
         "demo_gateway:app",
-        host="0.0.0.0",
-        port=5000,
+        host=GATEWAY_HOST,
+        port=GATEWAY_PORT,
         reload=True,
         log_level="info"
     )

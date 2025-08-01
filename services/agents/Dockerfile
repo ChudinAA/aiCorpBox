@@ -40,11 +40,7 @@ RUN mkdir -p logs data cache && \
 USER agentuser
 
 # Environment variables
-ENV PYTHONPATH=/app \
-    OLLAMA_API_BASE=http://ollama:11434 \
-    RAG_API_BASE=http://rag:8001 \
-    POSTGRES_HOST=postgres \
-    POSTGRES_PORT=5432
+ENV PYTHONPATH=/app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

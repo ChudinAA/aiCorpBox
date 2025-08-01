@@ -57,10 +57,7 @@ USER ollama
 WORKDIR /home/ollama
 
 # Set environment variables
-ENV OLLAMA_HOST=0.0.0.0 \
-    OLLAMA_PORT=11434 \
-    OLLAMA_MODELS_DIR=/home/ollama/.ollama/models \
-    OLLAMA_KEEP_ALIVE=24h
+ENV OLLAMA_MODELS_DIR=/home/ollama/.ollama/models
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

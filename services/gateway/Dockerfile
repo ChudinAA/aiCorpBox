@@ -39,11 +39,7 @@ RUN mkdir -p logs static && \
 USER gatewayuser
 
 # Environment variables
-ENV PYTHONPATH=/app \
-    GATEWAY_HOST=0.0.0.0 \
-    GATEWAY_PORT=5000 \
-    SECRET_KEY=your-secret-key-here \
-    API_TOKEN=your-api-token-here
+ENV PYTHONPATH=/app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

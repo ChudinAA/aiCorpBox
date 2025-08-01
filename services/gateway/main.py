@@ -50,8 +50,10 @@ ACTIVE_CONNECTIONS = Gauge('gateway_active_websocket_connections', 'Active WebSo
 SERVICE_REQUESTS = Counter('gateway_service_requests_total', 'Requests to backend services', ['service', 'status'])
 
 # Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
-API_TOKEN = os.getenv("API_TOKEN", "your-api-token-here")
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key-change-in-production")
+API_TOKEN = os.getenv("API_TOKEN", "default-api-token-change-in-production")
+GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
+GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))
 
 # Service URLs
 OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://ollama:11434")
@@ -628,8 +630,8 @@ async def metrics():
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=5000,
+        host=GATEWAY_HOST,
+        port=GATEWAY_PORT,
         reload=False,
         workers=1,  # Single worker for WebSocket support
         log_level="info"

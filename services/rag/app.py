@@ -1,4 +1,22 @@
+"""
+RAG Service - Document processing and retrieval using LlamaIndex
+"""
+
 import os
+from typing import Optional
+
+# Configuration from environment variables
+RAG_HOST = os.getenv("RAG_HOST", "0.0.0.0")
+RAG_PORT = int(os.getenv("RAG_PORT", "8001"))
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://ollama:11434")
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_DB = os.getenv("POSTGRES_DB", "aibox")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+
 import logging
 import asyncio
 import hashlib
@@ -46,7 +64,7 @@ with open("/app/config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 # Database setup
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:password@postgres:5432/aibox')
+DATABASE_URL = os.getenv('DATABASE_URL', f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}')
 
 engine = sa.create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -102,8 +120,8 @@ async def lifespan(app: FastAPI):
 
         # Initialize Qdrant client
         qdrant_client = QdrantClient(
-            host=os.getenv("QDRANT_HOST", "qdrant"),
-            port=int(os.getenv("QDRANT_PORT", "6333"))
+            host=QDRANT_HOST,
+            port=int(QDRANT_PORT)
         )
 
         # Create collection if it doesn't exist
@@ -135,7 +153,7 @@ async def lifespan(app: FastAPI):
         # Initialize LLM
         llm = Ollama(
             model=config["llm"]["model"],
-            base_url=os.getenv("OLLAMA_API_BASE", "http://ollama:11434"),
+            base_url=OLLAMA_API_BASE,
             temperature=config["llm"]["temperature"]
         )
 
@@ -287,7 +305,7 @@ async def health_check():
     # Check Ollama
     try:
         import requests
-        response = requests.get(f"{os.getenv('OLLAMA_API_BASE', 'http://ollama:11434')}/api/tags", timeout=5)
+        response = requests.get(f"{OLLAMA_API_BASE}/api/tags", timeout=5)
         services["ollama"] = "healthy" if response.status_code == 200 else "unhealthy"
     except Exception:
         services["ollama"] = "unhealthy"
@@ -472,8 +490,8 @@ async def metrics():
 if __name__ == "__main__":
     uvicorn.run(
         "app:app",
-        host="0.0.0.0",
-        port=8001,
+        host=RAG_HOST,
+        port=RAG_PORT,
         reload=False,
         workers=4,
         log_level="info"

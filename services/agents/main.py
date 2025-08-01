@@ -1,4 +1,21 @@
 """
+AI Agents Service - Intelligent agents for document and database queries
+"""
+
+import os
+from typing import Optional
+
+# Configuration from environment variables
+AGENTS_HOST = os.getenv("AGENTS_HOST", "0.0.0.0")
+AGENTS_PORT = int(os.getenv("AGENTS_PORT", "8002"))
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://ollama:11434")
+RAG_API_BASE = os.getenv("RAG_API_BASE", "http://rag:8001")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_DB = os.getenv("POSTGRES_DB", "aibox")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+"""
 AI Agents Service - Main FastAPI application
 """
 

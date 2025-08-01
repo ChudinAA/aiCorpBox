@@ -39,12 +39,7 @@ RUN mkdir -p data logs uploads embeddings_cache && \
 USER raguser
 
 # Environment variables
-ENV PYTHONPATH=/app \
-    OLLAMA_API_BASE=http://ollama:11434 \
-    QDRANT_HOST=qdrant \
-    QDRANT_PORT=6333 \
-    POSTGRES_HOST=postgres \
-    POSTGRES_PORT=5432
+ENV PYTHONPATH=/app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

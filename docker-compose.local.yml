@@ -10,18 +10,10 @@ services:
     container_name: aibox-gateway
     ports:
       - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - QDRANT_URL=${QDRANT_URL}
-      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
-      - RAG_API_BASE=${RAG_API_BASE}
-      - AGENTS_API_BASE=${AGENTS_API_BASE}
-      - ENVIRONMENT=${ENVIRONMENT}
       - LOG_LEVEL=INFO
-      - API_TOKEN=${API_TOKEN}
-      - SECRET_KEY=${GATEWAY_SECRET_KEY}
-      - GATEWAY_HOST=${GATEWAY_HOST}
-      - GATEWAY_PORT=${GATEWAY_PORT}
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,18 +38,8 @@ services:
     container_name: aibox-rag
     ports:
       - "${RAG_PORT}:${RAG_PORT}"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - QDRANT_HOST=${VECTOR_DB_HOST}
-      - QDRANT_PORT=${VECTOR_DB_PORT}
-      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
-      - ENVIRONMENT=${ENVIRONMENT}
-      - RAG_PORT=${RAG_PORT}
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,16 +64,8 @@ services:
     container_name: aibox-agents
     ports:
       - "${AGENTS_PORT}:${AGENTS_PORT}"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
-      - ENVIRONMENT=${ENVIRONMENT}
-      - AGENTS_PORT=${AGENTS_PORT}
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,10 +90,10 @@ services:
       - "${OLLAMA_PORT}:${OLLAMA_PORT}"
     volumes:
       - ollama-data:/root/.ollama
+    env_file:
+      - .env
     environment:
-      - OLLAMA_HOST=${OLLAMA_HOST}
       - OLLAMA_ORIGINS=*
-      - OLLAMA_PORT=${OLLAMA_PORT}
     networks:
       - aibox-network
     restart: unless-stopped

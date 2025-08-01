@@ -1,4 +1,3 @@
-
 # Core FastAPI and server
 fastapi
 uvicorn[standard]
@@ -44,5 +43,5 @@ pandas
 scikit-learn
 
 # Monitoring and logging
-prometheus-client
 structlog
+prometheus-client

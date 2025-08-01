@@ -27,15 +27,33 @@ scrape_configs:
     scrape_interval: 5s
     metrics_path: /metrics
 
-  # Gateway service metrics (with authentication)
+  # Gateway service metrics
   - job_name: 'ai-box-gateway'
     static_configs:
       - targets: ['gateway:5000']
     scrape_interval: 15s
     metrics_path: /metrics
     scrape_timeout: 10s
-    headers:
-      Authorization: 'Bearer your-api-token-here'
+    # Alternative: Basic authentication (if needed)
+    # basic_auth:
+    #   username: "metrics"
+    #   password: "your-password"
+
+  # RAG service metrics
+  - job_name: 'ai-box-rag'
+    static_configs:
+      - targets: ['rag:8001']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Agents service metrics
+  - job_name: 'ai-box-agents'
+    static_configs:
+      - targets: ['agents:8002']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
 
   # Gateway health check (separate job without auth requirement)
   - job_name: 'ai-box-gateway-health'

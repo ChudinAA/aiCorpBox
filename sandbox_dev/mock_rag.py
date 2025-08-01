@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Mock RAG Service for development testing
@@ -10,6 +9,15 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 app = FastAPI(title="Mock RAG Service", version="1.0.0")
+
+# Mock configuration
+config = {
+    "vector_store": {"collection_name": "documents"},
+    "embeddings": {"model": "all-MiniLM-L6-v2", "dimension": 384},
+    "llm": {"model": "llama3.1", "temperature": 0.7},
+    "text_processing": {"chunk_size": 512, "chunk_overlap": 50},
+    "retrieval": {"top_k": 5}
+}
 
 class QueryRequest(BaseModel):
     query: str

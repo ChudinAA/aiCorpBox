@@ -27,7 +27,7 @@ class ServiceManager:
             'HOST': '0.0.0.0',
             'PORT': str(port),
             'ENVIRONMENT': 'development',
-            'DATABASE_URL': 'postgresql://neondb_owner:password@localhost:5432/main',
+            'DATABASE_URL': 'sqlite:///./aibox_dev.db',
             'OLLAMA_API_BASE': 'http://0.0.0.0:11434',
             'QDRANT_URL': 'http://0.0.0.0:6333',
             'GATEWAY_PORT': '5000',

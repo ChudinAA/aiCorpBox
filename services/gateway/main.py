@@ -16,7 +16,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, Depends, Request, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 import aiohttp
 import requests
@@ -623,7 +623,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, user_id: str 
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint"""
-    from fastapi.responses import Response
     return Response(generate_latest(), media_type="text/plain")
 
 if __name__ == "__main__":

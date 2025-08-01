@@ -467,8 +467,6 @@ async def delete_document(document_id: int, db: Session = Depends(get_db)):
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint"""
-    from prometheus_client import generate_latest
-    from fastapi.responses import Response
     return Response(generate_latest(), media_type="text/plain")
 
 if __name__ == "__main__":

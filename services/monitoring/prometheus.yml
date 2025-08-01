@@ -34,10 +34,6 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
     scrape_timeout: 10s
-    # Alternative: Basic authentication (if needed)
-    # basic_auth:
-    #   username: "metrics"
-    #   password: "your-password"
 
   # RAG service metrics
   - job_name: 'ai-box-rag'
@@ -55,57 +51,8 @@ scrape_configs:
     metrics_path: /metrics
     scrape_timeout: 10s
 
-  # Gateway health check (separate job without auth requirement)
-  - job_name: 'ai-box-gateway-health'
-    static_configs:
-      - targets: ['gateway:5000']
-    scrape_interval: 30s
-    metrics_path: /health
-    scrape_timeout: 10s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'up'
-        target_label: service
-        replacement: 'gateway'
-
-  # RAG service health check
-  - job_name: 'ai-box-rag-health'
-    static_configs:
-      - targets: ['rag:8001']
-    scrape_interval: 30s
-    metrics_path: /health
-    scrape_timeout: 10s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'up'
-        target_label: service
-        replacement: 'rag'
-
-  # Agents service health check
-  - job_name: 'ai-box-agents-health'
-    static_configs:
-      - targets: ['agents:8002']
-    scrape_interval: 30s
-    metrics_path: /health
-    scrape_timeout: 10s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'up'
-        target_label: service
-        replacement: 'agents'
-
-  # Ollama health check (using correct endpoint)
-  - job_name: 'ai-box-ollama-health'
-    static_configs:
-      - targets: ['ollama:11434']
-    scrape_interval: 60s
-    metrics_path: /api/tags
-    scrape_timeout: 30s
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'up'
-        target_label: service
-        replacement: 'ollama'
+  # Note: Health checks are handled by Prometheus itself via the 'up' metric
+  # which automatically checks if the target is reachable
 
   # Qdrant metrics
   - job_name: 'ai-box-qdrant'
@@ -143,24 +90,9 @@ scrape_configs:
   #   scrape_interval: 30s
   #   scrape_timeout: 10s
 
-  # Blackbox exporter for endpoint monitoring
-  # - job_name: 'blackbox'
-  #   metrics_path: /probe
-  #   params:
-  #     module: [http_2xx]
-  #   static_configs:
-  #     - targets:
-  #       - http://gateway:5000/health
-  #       - http://rag:8001/health
-  #       - http://agents:8002/health
-  #       - http://ollama:11434/api/tags
-  #   relabel_configs:
-  #     - source_labels: [__address__]
-  #       target_label: __param_target
-  #     - source_labels: [__param_target]
-  #       target_label: instance
-  #     - target_label: __address__
-  #       replacement: blackbox-exporter:9115
+  # Health monitoring via up metric (automatic)
+  # The 'up' metric automatically shows if services are reachable
+  # Additional health checks can be implemented via blackbox exporter if needed
 
 # Remote write configuration (for external monitoring systems)
 # remote_write:

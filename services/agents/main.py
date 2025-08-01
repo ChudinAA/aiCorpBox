@@ -24,6 +24,8 @@ from tools.custom_tools import get_custom_tools, get_tool_by_name
 
 # Database
 import sqlalchemy as sa
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -41,7 +43,7 @@ Base = declarative_base()
 # Database models
 class ConversationModel(Base):
     __tablename__ = "agent_conversations"
-    
+
     id = sa.Column(sa.Integer, primary_key=True, index=True)
     session_id = sa.Column(sa.String, index=True)
     agent_type = sa.Column(sa.String, index=True)
@@ -52,7 +54,7 @@ class ConversationModel(Base):
 
 class AgentSessionModel(Base):
     __tablename__ = "agent_sessions"
-    
+
     id = sa.Column(sa.Integer, primary_key=True, index=True)
     session_id = sa.Column(sa.String, unique=True, index=True)
     user_id = sa.Column(sa.String, index=True)
@@ -107,17 +109,17 @@ class ConversationHistoryResponse(BaseModel):
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
-    
+
     async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
         self.active_connections[session_id] = websocket
         logger.info(f"WebSocket connected for session: {session_id}")
-    
+
     def disconnect(self, session_id: str):
         if session_id in self.active_connections:
             del self.active_connections[session_id]
             logger.info(f"WebSocket disconnected for session: {session_id}")
-    
+
     async def send_personal_message(self, message: dict, session_id: str):
         if session_id in self.active_connections:
             websocket = self.active_connections[session_id]
@@ -133,22 +135,42 @@ manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     """Initialize services on startup"""
     try:
-        # Initialize database
-        Base.metadata.create_all(bind=engine)
+        # Create tables only if they don't exist
+        try:
+            # Check if tables exist before creating
+            inspector = sa.inspect(engine)
+            existing_tables = inspector.get_table_names()
+
+            # Create only missing tables
+            tables_to_create = []
+            for table in Base.metadata.tables.values():
+                if table.name not in existing_tables:
+                    tables_to_create.append(table)
+
+            if tables_to_create:
+                logger.info(f"Creating missing tables: {[t.name for t in tables_to_create]}")
+                Base.metadata.create_all(bind=engine, tables=tables_to_create)
+            else:
+                logger.info("All required tables already exist")
+
+        except Exception as e:
+            logger.error(f"Error checking/creating tables: {e}")
+            # Fallback to create_all with checkfirst
+            Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("Database initialized")
-        
+
         # Initialize agents
         doc_agent = get_document_agent()
         db_agent = get_database_agent()
-        
+
         logger.info("AI Agents service initialized successfully")
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize agents service: {e}")
         raise
-    
+
     yield
-    
+
     # Cleanup
     logger.info("Shutting down AI Agents service")
 
@@ -205,21 +227,21 @@ async def save_conversation(
 async def health_check():
     """Health check endpoint"""
     agents_status = {}
-    
+
     # Check document agent
     try:
         doc_agent = get_document_agent()
         agents_status["document"] = "healthy"
     except Exception:
         agents_status["document"] = "unhealthy"
-    
+
     # Check database agent
     try:
         db_agent = get_database_agent()
         agents_status["database"] = "healthy"
     except Exception:
         agents_status["database"] = "unhealthy"
-    
+
     # Check database connection
     try:
         with engine.connect() as conn:
@@ -227,10 +249,10 @@ async def health_check():
         database_status = "healthy"
     except Exception:
         database_status = "unhealthy"
-    
+
     # Get available tools
     tools = [tool.name for tool in get_custom_tools()]
-    
+
     return HealthResponse(
         status="healthy" if all(s == "healthy" for s in agents_status.values()) and database_status == "healthy" else "partial",
         agents=agents_status,
@@ -247,7 +269,7 @@ async def chat_with_agent(
     """Chat with a specific agent"""
     try:
         start_time = datetime.now()
-        
+
         # Route to appropriate agent
         if request.agent_type == "document":
             result = await process_document_query(request.message, request.session_id)
@@ -255,7 +277,7 @@ async def chat_with_agent(
             result = await process_database_query(request.message, request.session_id)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown agent type: {request.agent_type}")
-        
+
         # Create response
         response = AgentResponse(
             answer=result.get("answer", ""),
@@ -265,7 +287,7 @@ async def chat_with_agent(
             metadata=result.get("metadata", {}),
             timestamp=datetime.now().isoformat()
         )
-        
+
         # Save conversation in background
         background_tasks.add_task(
             save_conversation,
@@ -280,16 +302,16 @@ async def chat_with_agent(
                 "request_metadata": request.metadata
             }
         )
-        
+
         # Send WebSocket notification if session is connected
         if request.session_id:
             await manager.send_personal_message({
                 "type": "agent_response",
                 "data": response.dict()
             }, request.session_id)
-        
+
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -302,25 +324,25 @@ async def create_session(request: SessionRequest, db: Session = Depends(get_db))
     try:
         import uuid
         session_id = str(uuid.uuid4())
-        
+
         session = AgentSessionModel(
             session_id=session_id,
             user_id=request.user_id,
             agent_type=request.agent_type,
             session_metadata=request.metadata
         )
-        
+
         db.add(session)
         db.commit()
         db.refresh(session)
-        
+
         return SessionResponse(
             session_id=session_id,
             agent_type=request.agent_type,
             status="active",
             created_at=session.created_at.isoformat()
         )
-        
+
     except Exception as e:
         logger.error(f"Error creating session: {e}")
         db.rollback()
@@ -333,7 +355,7 @@ async def delete_session(session_id: str, db: Session = Depends(get_db)):
         session = db.query(AgentSessionModel).filter(AgentSessionModel.session_id == session_id).first()
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         # Reset agent memory
         if session.agent_type == "document":
             agent = get_document_agent()
@@ -341,16 +363,16 @@ async def delete_session(session_id: str, db: Session = Depends(get_db)):
         elif session.agent_type == "database":
             agent = get_database_agent()
             agent.reset_memory(session_id)
-        
+
         # Update session status
         session.status = "closed"
         db.commit()
-        
+
         # Disconnect WebSocket if connected
         manager.disconnect(session_id)
-        
+
         return {"message": "Session deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -365,7 +387,7 @@ async def get_conversation_history(session_id: str, db: Session = Depends(get_db
         conversations = db.query(ConversationModel).filter(
             ConversationModel.session_id == session_id
         ).order_by(ConversationModel.created_at).all()
-        
+
         history = []
         for conv in conversations:
             history.append({
@@ -376,13 +398,13 @@ async def get_conversation_history(session_id: str, db: Session = Depends(get_db
                 "metadata": conv.conversation_metadata,
                 "created_at": conv.created_at.isoformat()
             })
-        
+
         return ConversationHistoryResponse(
             session_id=session_id,
             conversations=history,
             total_count=len(history)
         )
-        
+
     except Exception as e:
         logger.error(f"Error getting conversation history: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
@@ -393,16 +415,16 @@ async def list_tools():
     try:
         tools = get_custom_tools()
         tool_info = []
-        
+
         for tool in tools:
             tool_info.append({
                 "name": tool.name,
                 "description": tool.description,
                 "args_schema": tool.args_schema.schema() if tool.args_schema else None
             })
-        
+
         return ToolListResponse(tools=tool_info)
-        
+
     except Exception as e:
         logger.error(f"Error listing tools: {e}")
         raise HTTPException(status_code=500, detail=f"Error listing tools: {str(e)}")
@@ -414,10 +436,10 @@ async def execute_tool(tool_name: str, args: Dict[str, Any]):
         tool = get_tool_by_name(tool_name)
         if not tool:
             raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
-        
+
         # Execute tool
         result = tool._run(**args)
-        
+
         return {
             "success": True,
             "tool_name": tool_name,
@@ -425,7 +447,7 @@ async def execute_tool(tool_name: str, args: Dict[str, Any]):
             "result": result,
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -436,20 +458,20 @@ async def execute_tool(tool_name: str, args: Dict[str, Any]):
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time communication"""
     await manager.connect(websocket, session_id)
-    
+
     try:
         while True:
             # Wait for message from client
             data = await websocket.receive_text()
-            
+
             try:
                 message = json.loads(data)
-                
+
                 if message.get("type") == "chat":
                     # Process chat message
                     agent_type = message.get("agent_type", "document")
                     user_message = message.get("message", "")
-                    
+
                     # Route to appropriate agent
                     if agent_type == "document":
                         result = await process_document_query(user_message, session_id)
@@ -457,20 +479,20 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                         result = await process_database_query(user_message, session_id)
                     else:
                         result = {"answer": f"Unknown agent type: {agent_type}", "error": True}
-                    
+
                     # Send response
                     await manager.send_personal_message({
                         "type": "chat_response",
                         "data": result
                     }, session_id)
-                
+
                 elif message.get("type") == "ping":
                     # Respond to ping
                     await manager.send_personal_message({
                         "type": "pong",
                         "timestamp": datetime.now().isoformat()
                     }, session_id)
-                
+
             except json.JSONDecodeError:
                 await manager.send_personal_message({
                     "type": "error",
@@ -481,7 +503,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     "type": "error",
                     "message": str(e)
                 }, session_id)
-                
+
     except Exception as e:
         logger.error(f"WebSocket error for session {session_id}: {e}")
     finally:

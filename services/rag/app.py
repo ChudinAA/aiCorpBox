@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import hashlib
 from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -336,7 +337,6 @@ async def upload_document(
             raise HTTPException(status_code=400, detail="No text content found in document")
 
         # Create document hash
-        import hashlib
         content_hash = hashlib.sha256(content).hexdigest()
 
         # Check if document already exists

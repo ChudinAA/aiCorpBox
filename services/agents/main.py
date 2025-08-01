@@ -4,6 +4,7 @@ AI Agents Service - Main FastAPI application
 
 import logging
 import os
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -319,7 +320,6 @@ async def chat_with_agent(
 async def create_session(request: SessionRequest, db: Session = Depends(get_db)):
     """Create a new agent session"""
     try:
-        import uuid
         session_id = str(uuid.uuid4())
 
         session = AgentSessionModel(

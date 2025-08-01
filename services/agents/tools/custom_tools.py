@@ -36,15 +36,15 @@ class FileOperationInput(BaseModel):
     encoding: str = Field(default="utf-8", description="File encoding")
 
 class TextProcessingInput(BaseModel):
-    """Input schema for text processing"""
+    """Input schema for text processing tool"""
     text: str = Field(description="Text to process")
-    operation: str = Field(description="Operation: summarize, extract_entities, sentiment, keywords")
-    options: Dict[str, Any] = Field(default_factory=dict, description="Additional options")
+    operation: str = Field(description="Operation to perform (summarize, extract_entities, sentiment)")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Additional options")
 
 class CalculationInput(BaseModel):
-    """Input schema for calculations"""
-    expression: str = Field(description="Mathematical expression or calculation")
-    variables: Dict[str, float] = Field(default_factory=dict, description="Variable definitions")
+    """Input schema for calculation tool"""
+    expression: str = Field(description="Mathematical expression to evaluate")
+    variables: Optional[Dict[str, float]] = Field(default=None, description="Variables to substitute")
 
 class WebScrapingInput(BaseModel):
     """Input schema for web scraping"""
@@ -53,10 +53,10 @@ class WebScrapingInput(BaseModel):
     max_content_length: int = Field(default=10000, description="Maximum content length")
 
 class DataTransformInput(BaseModel):
-    """Input schema for data transformation"""
+    """Input schema for data transformation tool"""
     data: Union[List[Dict], Dict] = Field(description="Data to transform")
-    operation: str = Field(description="Operation: filter, sort, group, aggregate")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Operation parameters")
+    operation: str = Field(description="Transformation operation (filter, sort, group)")
+    parameters: Optional[Dict[str, Any]] = Field(default=None, description="Operation parameters")
 
 class APICallTool(BaseTool):
     """Tool for making HTTP API calls"""
@@ -196,6 +196,62 @@ class FileOperationTool(BaseTool):
             logger.error(f"File operation error: {e}")
             return json.dumps({"error": str(e)})
 
+class CalculationTool(BaseTool):
+    """Tool for mathematical calculations"""
+    name: str = "calculation"
+    description: str = "Perform mathematical calculations and evaluations"
+    args_schema: type = CalculationInput
+
+    def _run(self, expression: str, variables: Dict[str, float] = None) -> str:
+        """Execute calculation"""
+        try:
+            variables = variables or {}
+
+            # Security: only allow safe mathematical operations
+            ops = {
+                ast.Add: operator.add,
+                ast.Sub: operator.sub,
+                ast.Mult: operator.mul,
+                ast.Div: operator.truediv,
+                ast.Pow: operator.pow,
+                ast.BitXor: operator.xor,
+                ast.USub: operator.neg,
+                ast.UAdd: operator.pos,
+            }
+
+            def eval_expr(node):
+                if isinstance(node, ast.Num):  # number
+                    return node.n
+                elif isinstance(node, ast.Name):  # variable
+                    if node.id in variables:
+                        return variables[node.id]
+                    else:
+                        raise ValueError(f"Variable '{node.id}' not defined")
+                elif isinstance(node, ast.BinOp):  # binary operation
+                    return ops[type(node.op)](eval_expr(node.left), eval_expr(node.right))
+                elif isinstance(node, ast.UnaryOp):  # unary operation
+                    return ops[type(node.op)](eval_expr(node.operand))
+                else:
+                    raise TypeError(f"Unsupported operation: {type(node)}")
+
+            # Parse and evaluate expression
+            parsed = ast.parse(expression, mode='eval')
+            result = eval_expr(parsed.body)
+
+            return json.dumps({
+                "success": True,
+                "expression": expression,
+                "variables": variables,
+                "result": result
+            })
+
+        except Exception as e:
+            return json.dumps({
+                "success": False,
+                "error": str(e),
+                "expression": expression
+            })
+
 class TextProcessingTool(BaseTool):
     """Tool for text processing operations"""
     name: str = "text_processing"
@@ -225,151 +281,160 @@ class TextProcessingTool(BaseTool):
                 })
 
             elif operation == "extract_entities":
-                # Simple entity extraction (could be enhanced with NLP libraries)
-                import re
-
-                # Extract emails
+                # Simple entity extraction
                 emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
-
-                # Extract URLs
-                urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', text)
-
-                # Extract phone numbers (basic pattern)
-                phones = re.findall(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', text)
-
-                # Extract potential names (capitalized words)
-                names = re.findall(r'\b[A-Z][a-z]+\s+[A-Z][a-z]+\b', text)
+                phones = re.findall(r'\b\d{3}-\d{3}-\d{4}\b|\b\(\d{3}\)\s*\d{3}-\d{4}\b', text)
+                urls = re.findall(r'https?://[^\s<>"{}|\\^`[\]]+', text)
 
                 return json.dumps({
                     "success": True,
                     "operation": "extract_entities",
                     "entities": {
                         "emails": emails,
-                        "urls": urls,
                         "phones": phones,
-                        "potential_names": names
+                        "urls": urls
                     }
                 })
 
             elif operation == "sentiment":
-                # Simple sentiment analysis based on word counting
-                positive_words = ["good", "great", "excellent", "amazing", "wonderful", "fantastic", "awesome", "love", "like", "happy", "pleased"]
-                negative_words = ["bad", "terrible", "awful", "horrible", "hate", "dislike", "sad", "angry", "disappointed", "frustrated"]
+                # Simple sentiment analysis based on keywords
+                positive_words = ["good", "great", "excellent", "amazing", "wonderful", "fantastic"]
+                negative_words = ["bad", "terrible", "awful", "horrible", "disappointing", "poor"]
 
                 text_lower = text.lower()
-                positive_score = sum(1 for word in positive_words if word in text_lower)
-                negative_score = sum(1 for word in negative_words if word in text_lower)
+                positive_count = sum(1 for word in positive_words if word in text_lower)
+                negative_count = sum(1 for word in negative_words if word in text_lower)
 
-                if positive_score > negative_score:
+                if positive_count > negative_count:
                     sentiment = "positive"
-                    confidence = positive_score / (positive_score + negative_score + 1)
-                elif negative_score > positive_score:
+                elif negative_count > positive_count:
                     sentiment = "negative"
-                    confidence = negative_score / (positive_score + negative_score + 1)
                 else:
                     sentiment = "neutral"
-                    confidence = 0.5
 
                 return json.dumps({
                     "success": True,
                     "operation": "sentiment",
                     "sentiment": sentiment,
-                    "confidence": round(confidence, 2),
-                    "positive_signals": positive_score,
-                    "negative_signals": negative_score
-                })
-
-            elif operation == "keywords":
-                # Simple keyword extraction
-                import re
-                from collections import Counter
-
-                # Clean and tokenize
-                words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
-
-                # Remove common stop words
-                stop_words = {"the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "is", "are", "was", "were", "been", "have", "has", "had", "will", "would", "could", "should", "this", "that", "these", "those"}
-                words = [word for word in words if word not in stop_words]
-
-                # Count and get top keywords
-                word_counts = Counter(words)
-                top_keywords = word_counts.most_common(options.get("max_keywords", 10))
-
-                return json.dumps({
-                    "success": True,
-                    "operation": "keywords",
-                    "keywords": [{"word": word, "count": count} for word, count in top_keywords],
-                    "total_words": len(words),
-                    "unique_words": len(word_counts)
+                    "positive_score": positive_count,
+                    "negative_score": negative_count
                 })
 
             else:
-                return json.dumps({"error": f"Unknown text processing operation: {operation}"})
+                return json.dumps({
+                    "success": False,
+                    "error": f"Unknown operation: {operation}"
+                })
 
         except Exception as e:
-            logger.error(f"Text processing error: {e}")
-            return json.dumps({"error": str(e)})
-
-class CalculationTool(BaseTool):
-    """Tool for mathematical calculations"""
-    name: str = "calculation"
-    description: str = "Perform mathematical calculations and evaluations"
-    args_schema: type = CalculationInput
-
-    def _run(self, expression: str, variables: Dict[str, float] = None) -> str:
-        """Execute calculation"""
-        try:
-            variables = variables or {}
-
-            # Security: only allow safe mathematical operations
-            import ast
-            import operator
-
-            # Allowed operations
-            ops = {
-                ast.Add: operator.add,
-                ast.Sub: operator.sub,
-                ast.Mult: operator.mul,
-                ast.Div: operator.truediv,
-                ast.Pow: operator.pow,
-                ast.BitXor: operator.xor,
-                ast.USub: operator.neg,
-                ast.UAdd: operator.pos,
-            }
-
-            def eval_expr(node):
-                if isinstance(node, ast.Num):  # number
-                    return node.n
-                elif isinstance(node, ast.Name):  # variable
-                    if node.id in variables:
-                        return variables[node.id]
-                    else:
-                        raise ValueError(f"Unknown variable: {node.id}")
-                elif isinstance(node, ast.BinOp):  # binary operation
-                    return ops[type(node.op)](eval_expr(node.left), eval_expr(node.right))
-                elif isinstance(node, ast.UnaryOp):  # unary operation
-                    return ops[type(node.op)](eval_expr(node.operand))
-                else:
-                    raise TypeError(f"Unsupported operation: {type(node)}")
-
-            # Parse and evaluate
-            node = ast.parse(expression, mode='eval')
-            result = eval_expr(node.body)
-
-            return json.dumps({
-                "success": True,
-                "expression": expression,
-                "variables": variables,
-                "result": result,
-                "result_type": type(result).__name__
-            })
-
-        except Exception as e:
-            logger.error(f"Calculation error: {e}")
             return json.dumps({
                 "success": False,
-                "expression": expression,
-                "error": str(e)
+                "error": str(e),
+                "operation": operation
+            })
+
+class DataTransformTool(BaseTool):
+    """Tool for data transformation operations"""
+    name: str = "data_transform"
+    description: str = "Transform and manipulate data structures"
+    args_schema: type = DataTransformInput
+
+    def _run(self, data: Union[List[Dict], Dict], operation: str, parameters: Dict[str, Any] = None) -> str:
+        """Execute data transformation"""
+        try:
+            parameters = parameters or {}
+
+            if operation == "filter":
+                if not isinstance(data, list):
+                    return json.dumps({"error": "Filter operation requires list of dictionaries"})
+
+                field = parameters.get("field")
+                value = parameters.get("value")
+                operator_type = parameters.get("operator", "equals")
+
+                if not field:
+                    return json.dumps({"error": "Field parameter required for filter"})
+
+                filtered_data = []
+                for item in data:
+                    if field in item:
+                        item_value = item[field]
+
+                        if operator_type == "equals" and item_value == value:
+                            filtered_data.append(item)
+                        elif operator_type == "greater_than" and item_value > value:
+                            filtered_data.append(item)
+                        elif operator_type == "less_than" and item_value < value:
+                            filtered_data.append(item)
+                        elif operator_type == "contains" and str(value).lower() in str(item_value).lower():
+                            filtered_data.append(item)
+
+                return json.dumps({
+                    "success": True,
+                    "operation": "filter",
+                    "original_count": len(data),
+                    "filtered_count": len(filtered_data),
+                    "data": filtered_data
+                })
+
+            elif operation == "sort":
+                if not isinstance(data, list):
+                    return json.dumps({"error": "Sort operation requires list of dictionaries"})
+
+                field = parameters.get("field")
+                reverse = parameters.get("reverse", False)
+
+                if not field:
+                    return json.dumps({"error": "Field parameter required for sort"})
+
+                try:
+                    sorted_data = sorted(data, key=lambda x: x.get(field, 0), reverse=reverse)
+
+                    return json.dumps({
+                        "success": True,
+                        "operation": "sort",
+                        "field": field,
+                        "reverse": reverse,
+                        "count": len(sorted_data),
+                        "data": sorted_data
+                    })
+                except Exception as e:
+                    return json.dumps({"error": f"Sort error: {str(e)}"})
+
+            elif operation == "group":
+                if not isinstance(data, list):
+                    return json.dumps({"error": "Group operation requires list of dictionaries"})
+
+                field = parameters.get("field")
+                if not field:
+                    return json.dumps({"error": "Field parameter required for group"})
+
+                grouped_data = {}
+                for item in data:
+                    key = item.get(field, "unknown")
+                    if key not in grouped_data:
+                        grouped_data[key] = []
+                    grouped_data[key].append(item)
+
+                return json.dumps({
+                    "success": True,
+                    "operation": "group",
+                    "field": field,
+                    "groups": len(grouped_data),
+                    "data": grouped_data
+                })
+
+            else:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Unknown operation: {operation}"
+                })
+
+        except Exception as e:
+            return json.dumps({
+                "success": False,
+                "error": str(e),
+                "operation": operation
             })
 
 class WebScrapingTool(BaseTool):
@@ -436,138 +501,6 @@ class WebScrapingTool(BaseTool):
                 "error": str(e)
             })
 
-class DataTransformTool(BaseTool):
-    """Tool for data transformation operations"""
-    name: str = "data_transform"
-    description: str = "Transform and manipulate data structures"
-    args_schema: type = DataTransformInput
-
-    def _run(self, data: Union[List[Dict], Dict], operation: str, parameters: Dict[str, Any] = None) -> str:
-        """Execute data transformation"""
-        try:
-            parameters = parameters or {}
-
-            if operation == "filter":
-                if not isinstance(data, list):
-                    return json.dumps({"error": "Filter operation requires list of dictionaries"})
-
-                field = parameters.get("field")
-                value = parameters.get("value")
-                operator_type = parameters.get("operator", "equals")
-
-                if not field:
-                    return json.dumps({"error": "Field parameter required for filter"})
-
-                filtered_data = []
-                for item in data:
-                    if field in item:
-                        item_value = item[field]
-
-                        if operator_type == "equals" and item_value == value:
-                            filtered_data.append(item)
-                        elif operator_type == "greater_than" and item_value > value:
-                            filtered_data.append(item)
-                        elif operator_type == "less_than" and item_value < value:
-                            filtered_data.append(item)
-                        elif operator_type == "contains" and value in str(item_value):
-                            filtered_data.append(item)
-
-                return json.dumps({
-                    "success": True,
-                    "operation": "filter",
-                    "original_count": len(data),
-                    "filtered_count": len(filtered_data),
-                    "data": filtered_data
-                })
-
-            elif operation == "sort":
-                if not isinstance(data, list):
-                    return json.dumps({"error": "Sort operation requires list of dictionaries"})
-
-                field = parameters.get("field")
-                reverse = parameters.get("reverse", False)
-
-                if not field:
-                    return json.dumps({"error": "Field parameter required for sort"})
-
-                sorted_data = sorted(data, key=lambda x: x.get(field, ""), reverse=reverse)
-
-                return json.dumps({
-                    "success": True,
-                    "operation": "sort",
-                    "field": field,
-                    "reverse": reverse,
-                    "count": len(sorted_data),
-                    "data": sorted_data
-                })
-
-            elif operation == "group":
-                if not isinstance(data, list):
-                    return json.dumps({"error": "Group operation requires list of dictionaries"})
-
-                field = parameters.get("field")
-
-                if not field:
-                    return json.dumps({"error": "Field parameter required for group"})
-
-                grouped_data = {}
-                for item in data:
-                    key = item.get(field, "unknown")
-                    if key not in grouped_data:
-                        grouped_data[key] = []
-                    grouped_data[key].append(item)
-
-                return json.dumps({
-                    "success": True,
-                    "operation": "group",
-                    "field": field,
-                    "groups": len(grouped_data),
-                    "data": grouped_data
-                })
-
-            elif operation == "aggregate":
-                if not isinstance(data, list):
-                    return json.dumps({"error": "Aggregate operation requires list of dictionaries"})
-
-                field = parameters.get("field")
-                agg_type = parameters.get("type", "count")
-
-                if agg_type == "count":
-                    result = len(data)
-                elif agg_type == "sum" and field:
-                    result = sum(item.get(field, 0) for item in data if isinstance(item.get(field), (int, float)))
-                elif agg_type == "avg" and field:
-                    values = [item.get(field, 0) for item in data if isinstance(item.get(field), (int, float))]
-                    result = sum(values) / len(values) if values else 0
-                elif agg_type == "min" and field:
-                    values = [item.get(field) for item in data if item.get(field) is not None]
-                    result = min(values) if values else None
-                elif agg_type == "max" and field:
-                    values = [item.get(field) for item in data if item.get(field) is not None]
-                    result = max(values) if values else None
-                else:
-                    return json.dumps({"error": f"Unknown aggregation type: {agg_type}"})
-
-                return json.dumps({
-                    "success": True,
-                    "operation": "aggregate",
-                    "type": agg_type,
-                    "field": field,
-                    "result": result,
-                    "input_count": len(data)
-                })
-
-            else:
-                return json.dumps({"error": f"Unknown data transformation operation: {operation}"})
-
-        except Exception as e:
-            logger.error(f"Data transformation error: {e}")
-            return json.dumps({
-                "success": False,
-                "operation": operation,
-                "error": str(e)
-            })
-
 # Export all tools
 CUSTOM_TOOLS = [
     APICallTool(),
@@ -579,12 +512,20 @@ CUSTOM_TOOLS = [
 ]
 
 def get_custom_tools() -> List[BaseTool]:
-    """Get all custom tools"""
-    return CUSTOM_TOOLS
+    """Get list of all custom tools"""
+    return [
+        APICallTool(),
+        FileOperationTool(),
+        TextProcessingTool(),
+        CalculationTool(),
+        WebScrapingTool(),
+        DataTransformTool()
+    ]
 
 def get_tool_by_name(name: str) -> Optional[BaseTool]:
     """Get a specific tool by name"""
-    for tool in CUSTOM_TOOLS:
+    tools = get_custom_tools()
+    for tool in tools:
         if tool.name == name:
             return tool
     return None

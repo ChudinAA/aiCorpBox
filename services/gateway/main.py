@@ -6,11 +6,12 @@ import logging
 import os
 import json
 import asyncio
+import hashlib
+import hmac
+import uuid
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-import hashlib
-import hmac
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, Depends, Request, BackgroundTasks, Header
@@ -452,7 +453,6 @@ connectors = {}
 async def create_connector(request: ConnectorRequest, token: str = Depends(verify_api_token)):
     """Create integration connector"""
     try:
-        import uuid
         connector_id = str(uuid.uuid4())
         
         connector_config = {

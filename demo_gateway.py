@@ -40,23 +40,35 @@ Base = declarative_base()
 
 # Prometheus metrics (with registry check to avoid conflicts)
 try:
-    requests_total = Counter('aibox_requests_total', 'Total requests', ['method', 'endpoint'])
-    request_duration = Histogram('aibox_request_duration_seconds', 'Request duration')
-    active_connections = Gauge('aibox_active_websocket_connections', 'Active WebSocket connections')
-except ValueError:
-    # Metrics already exist (likely due to reload), get existing ones
-    from prometheus_client import REGISTRY
+    from prometheus_client import REGISTRY, CollectorRegistry
+    
+    # Check if metrics already exist
+    existing_metrics = {}
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name'):
+            existing_metrics[collector._name] = collector
+    
+    if 'aibox_requests_total' in existing_metrics:
+        requests_total = existing_metrics['aibox_requests_total']
+    else:
+        requests_total = Counter('aibox_requests_total', 'Total requests', ['method', 'endpoint'])
+    
+    if 'aibox_request_duration_seconds' in existing_metrics:
+        request_duration = existing_metrics['aibox_request_duration_seconds']
+    else:
+        request_duration = Histogram('aibox_request_duration_seconds', 'Request duration')
+    
+    if 'aibox_active_websocket_connections' in existing_metrics:
+        active_connections = existing_metrics['aibox_active_websocket_connections']
+    else:
+        active_connections = Gauge('aibox_active_websocket_connections', 'Active WebSocket connections')
+
+except Exception as e:
+    logger.error(f"Error initializing Prometheus metrics: {e}")
+    # Fallback to None values
     requests_total = None
     request_duration = None
     active_connections = None
-    for collector in list(REGISTRY._collector_to_names.keys()):
-        if hasattr(collector, '_name'):
-            if collector._name == 'aibox_requests_total':
-                requests_total = collector
-            elif collector._name == 'aibox_request_duration_seconds':
-                request_duration = collector
-            elif collector._name == 'aibox_active_websocket_connections':
-                active_connections = collector
 
 # Database Models
 class Conversation(Base):
@@ -493,7 +505,8 @@ async def main_page():
 async def demo_chat(message: ChatMessage):
     """Demo chat endpoint that simulates AI Box services"""
     start_time = datetime.utcnow()
-    requests_total.labels(method='POST', endpoint='/api/demo/chat').inc()
+    if requests_total:
+        requests_total.labels(method='POST', endpoint='/api/demo/chat').inc()
     
     try:
         # Simulate different service responses
@@ -531,7 +544,8 @@ async def demo_chat(message: ChatMessage):
             db.close()
         
         duration = (datetime.utcnow() - start_time).total_seconds()
-        request_duration.observe(duration)
+        if request_duration:
+            request_duration.observe(duration)
         
         return {
             "response": response_text,
@@ -585,7 +599,8 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication"""
     await websocket.accept()
     websocket_connections.append(websocket)
-    active_connections.set(len(websocket_connections))
+    if active_connections:
+        active_connections.set(len(websocket_connections))
     
     try:
         await websocket.send_text(json.dumps({
@@ -611,7 +626,8 @@ async def websocket_endpoint(websocket: WebSocket):
             
     except WebSocketDisconnect:
         websocket_connections.remove(websocket)
-        active_connections.set(len(websocket_connections))
+        if active_connections:
+            active_connections.set(len(websocket_connections))
 
 # Run the application
 if __name__ == "__main__":

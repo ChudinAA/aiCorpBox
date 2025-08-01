@@ -83,21 +83,12 @@ class ServiceManager:
         
         time.sleep(1)
         
-        # 2. RAG Service
-        if Path("services/rag/app.py").exists():
-            self.start_service(
-                "RAG Service",
-                "python -m uvicorn app:app --host 0.0.0.0 --port 8001",
-                8001,
-                cwd="services/rag"
-            )
-        else:
-            # Мок RAG сервиса
-            self.start_service(
-                "RAG Service (Mock)",
-                "python sandbox_dev/mock_rag.py",
-                8001
-            )
+        # 2. RAG Service - используем мок для упрощения тестирования
+        self.start_service(
+            "RAG Service (Mock)",
+            "python sandbox_dev/mock_rag.py",
+            8001
+        )
         
         time.sleep(1)
         

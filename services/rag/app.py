@@ -3,6 +3,7 @@ RAG Service - Document processing and retrieval using LlamaIndex
 """
 
 import os
+import yaml
 from typing import Optional
 
 # Configuration from environment variables
@@ -29,7 +30,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
-import yaml
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, Document, Settings

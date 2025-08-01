@@ -25,6 +25,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "langchain-ollama>=0.3.6",
     "pyyaml>=6.0.2",
+    "python-multipart>=0.0.20",
 ]
 
 [[tool.uv.index]]

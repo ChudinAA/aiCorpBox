@@ -32,8 +32,12 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python dev_environment.py"
+args = "python sandbox_dev/dev_environment.py"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 11434
+externalPort = 3000

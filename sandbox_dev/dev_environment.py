@@ -65,13 +65,23 @@ class ServiceManager:
         """Запуск всех сервисов AI Box"""
         
         # 1. Gateway (главный сервис на порту 5000)
-        self.start_service(
-            "Gateway", 
-            "python demo_gateway.py", 
-            5000
-        )
+        if Path("services/gateway/main.py").exists():
+            self.start_service(
+                "Gateway",
+                "python -m uvicorn main:app --host 0.0.0.0 --port 5000",
+                5000,
+                cwd="services/gateway"
+            )
+        else:
+            # Demo Gateway
+            self.start_service(
+                "Demo Gateway", 
+                "python demo_gateway.py", 
+                5000
+            )
         
-        time.sleep(2)
+        
+        time.sleep(1)
         
         # 2. RAG Service
         if Path("services/rag/app.py").exists():
@@ -85,7 +95,7 @@ class ServiceManager:
             # Мок RAG сервиса
             self.start_service(
                 "RAG Service (Mock)",
-                "python mock_rag.py",
+                "python sandbox_dev/mock_rag.py",
                 8001
             )
         
@@ -103,7 +113,7 @@ class ServiceManager:
             # Мок Agents сервиса
             self.start_service(
                 "Agents Service (Mock)",
-                "python mock_agents.py",
+                "python sandbox_dev/mock_agents.py",
                 8002
             )
         
@@ -112,7 +122,7 @@ class ServiceManager:
         # 4. Ollama Mock (если нет реального)
         self.start_service(
             "Ollama Mock",
-            "python mock_ollama.py",
+            "python sandbox_dev/mock_ollama.py",
             11434
         )
         
@@ -121,7 +131,7 @@ class ServiceManager:
         # 5. Qdrant Mock (если нет реального)
         self.start_service(
             "Qdrant Mock",
-            "python mock_qdrant.py",
+            "python sandbox_dev/mock_qdrant.py",
             6333
         )
         

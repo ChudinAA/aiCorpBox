@@ -328,9 +328,9 @@ async def health_check():
     services = {}
     
     # Check backend services
-    for service, url in [("ollama", OLLAMA_API_BASE), ("rag", RAG_API_BASE), ("agents", AGENTS_API_BASE)]:
+    for service, url, health_check_path in [("ollama", OLLAMA_API_BASE, "api/tags"), ("rag", RAG_API_BASE, "health"), ("agents", AGENTS_API_BASE, "health")]:
         try:
-            response = requests.get(f"{url}/health", timeout=5)
+            response = requests.get(f"{url}/{health_check_path}", timeout=5)
             services[service] = "healthy" if response.status_code == 200 else "unhealthy"
         except Exception:
             services[service] = "unhealthy"

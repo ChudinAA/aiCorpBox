@@ -634,9 +634,14 @@ async def websocket_endpoint(websocket: WebSocket):
 # Configuration from environment variables
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/aibox")
-OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:password@localhost:5432/main")
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://0.0.0.0:11434")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://0.0.0.0:6333")
+RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://0.0.0.0:8001")
+AGENTS_SERVICE_URL = os.getenv("AGENTS_SERVICE_URL", "http://0.0.0.0:8002")
+
+# Detect if we're in development mode
+DEV_MODE = os.getenv("ENVIRONMENT", "development") == "development"
 
 if __name__ == "__main__":
     print("🚀 Starting AI Box Demo Gateway...")

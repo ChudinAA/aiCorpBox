@@ -25,6 +25,15 @@ task = "shell.exec"
 args = "python demo_gateway.py"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Dev Environment"
+author = 41078776
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python dev_environment.py"
+
 [[ports]]
 localPort = 5000
 externalPort = 80

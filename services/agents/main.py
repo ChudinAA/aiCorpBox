@@ -4,7 +4,6 @@ AI Agents Service - Main FastAPI application
 
 import logging
 import os
-import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -14,7 +13,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from prometheus_client import generate_latest
 import json
 
 # Import agents
@@ -24,10 +23,8 @@ from tools.custom_tools import get_custom_tools, get_tool_by_name
 
 # Database
 import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import inspect
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.ext.declarative import declarative_base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

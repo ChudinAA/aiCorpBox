@@ -7,11 +7,11 @@ import yaml
 from typing import Optional
 
 # Configuration from environment variables
-RAG_HOST = os.getenv("RAG_HOST", "0.0.0.0")
+RAG_HOST = os.getenv("RAG_HOST", "rag")
 RAG_PORT = int(os.getenv("RAG_PORT", "8001"))
 OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://ollama:11434")
-QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+QDRANT_HOST = os.getenv("VECTOR_DB_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("VECTOR_DB_PORT", "6333"))
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_DB = os.getenv("POSTGRES_DB", "aibox")

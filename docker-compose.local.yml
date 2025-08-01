@@ -12,8 +12,6 @@ services:
       - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     env_file:
       - .env
-    environment:
-      - LOG_LEVEL=INFO
     depends_on:
       postgres:
         condition: service_healthy

@@ -50,7 +50,7 @@ ACTIVE_CONNECTIONS = Gauge('gateway_active_websocket_connections', 'Active WebSo
 SERVICE_REQUESTS = Counter('gateway_service_requests_total', 'Requests to backend services', ['service', 'status'])
 
 # Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key-change-in-production")
+SECRET_KEY = os.getenv("GATEWAY_SECRET_KEY", "default-secret-key-change-in-production")
 API_TOKEN = os.getenv("API_TOKEN", "default-api-token-change-in-production")
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))

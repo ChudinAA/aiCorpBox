@@ -15,8 +15,6 @@ services:
       - gateway-logs:/app/logs
     env_file:
       - .env
-    environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,8 +52,6 @@ services:
       - rag-logs:/app/logs
     env_file:
       - .env
-    environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,8 +89,6 @@ services:
       - agents-logs:/app/logs
     env_file:
       - .env
-    environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       postgres:
         condition: service_healthy

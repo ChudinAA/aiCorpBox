@@ -2,6 +2,32 @@
 # Использует образы из папки services
 
 services:
+  # AI Box Frontend - максимально обособленный интерфейс
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: aibox-frontend
+    ports:
+      - "3000:${FRONTEND_PORT}"
+    env_file:
+      - .env
+    environment:
+      - GATEWAY_URL=http://gateway:${GATEWAY_PORT}
+      - GATEWAY_WS_URL=ws://gateway:${GATEWAY_PORT}/ws
+      - NODE_ENV=development
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - aibox-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # AI Box Gateway - единая точка входа
   gateway:
     build:

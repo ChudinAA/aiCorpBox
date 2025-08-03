@@ -1,4 +1,4 @@
-modules = ["python-3.11", "postgresql-16"]
+modules = ["python-3.11", "postgresql-16", "nodejs-20"]
 
 [nix]
 channel = "stable-24_05"
@@ -8,24 +8,6 @@ packages = ["bash", "docker", "docker-compose", "glibcLocales", "libxcrypt", "li
 runButton = "Project"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "AI Box Demo"
-
-[[workflows.workflow]]
-name = "AI Box Demo"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python demo_gateway.py"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "Dev Environment"
 author = 41078776
 mode = "sequential"
@@ -33,6 +15,28 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python sandbox_dev/dev_environment.py"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "AI Box Frontend"
+
+[[workflows.workflow]]
+name = "AI Box Frontend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd services/frontend && npm start"
+waitForPort = 3000
+
+[[ports]]
+localPort = 3000
+externalPort = 4200
 
 [[ports]]
 localPort = 5000

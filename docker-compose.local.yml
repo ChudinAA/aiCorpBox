@@ -9,7 +9,7 @@ services:
       dockerfile: Dockerfile
     container_name: aibox-frontend
     ports:
-      - "3000:${FRONTEND_PORT}"
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     env_file:
       - .env
     environment:

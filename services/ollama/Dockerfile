@@ -45,6 +45,13 @@ echo "Model initialization complete."
 wait $OLLAMA_PID
 EOF
 
+# Create health check script
+RUN cat > /usr/local/bin/health-check.sh << 'EOF' && \
+    chmod +x /usr/local/bin/health-check.sh
+#!/bin/bash
+curl -f http://localhost:11434/api/tags >/dev/null 2>&1 || exit 1
+EOF
+
 # Switch to ollama user
 USER ollama
 WORKDIR /home/ollama

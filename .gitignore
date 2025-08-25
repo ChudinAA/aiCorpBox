@@ -80,3 +80,4 @@ dist/
 build/
 *.tar.gz
 *.zip
+WARP.md
